@@ -146,12 +146,16 @@ current harness results and provides **Scan again**. **Pair phone** opens the
 relay, QR/paste, 18-digit verification, and copyable terminal-style activity
 flow in a sheet.
 
+**Scan again** is asynchronous: the Mac acknowledges it immediately and the
+client follows per-provider import status while larger native histories finish.
+
 The client uses a signed, authenticated loopback connection to the local daemon
 and works without a phone pairing. The sidebar sorts pinned threads first; pin
 state is owned by the laptop and synchronized with the iOS client. It loads only
 the latest 30 messages initially and retrieves older pages when requested.
 Sending is optimistic: the message remains visible while the laptop provider
-works.
+works. Desktop provider-turn requests use a long-running deadline rather than
+the ordinary 30-second local API deadline.
 
 The desktop client creates conversations in enrolled projects, selects threads,
 switches provider after confirmation, chooses a model, interrupts a turn,

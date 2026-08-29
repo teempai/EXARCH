@@ -205,7 +205,12 @@ export class LaptopApiServer {
         if (this.history === undefined) {
           sendJson(response, 503, { error: "history_import_disabled" });
         } else {
-          sendJson(response, 200, await this.history.syncAll());
+          // A complete provider-history import can legitimately take longer
+          // than a client request deadline. Start it durably in the daemon and
+          // let clients follow /history-import/status instead of misreporting
+          // a healthy scan as timed out.
+          void this.history.syncAll().catch(() => undefined);
+          sendJson(response, 202, this.history.status());
         }
         return;
       }

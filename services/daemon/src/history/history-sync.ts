@@ -73,9 +73,23 @@ export class HistorySyncService {
   }
 
   syncAll(): Promise<HistoryImportStatus> {
-    this.running ??= this.enqueue(() => this.run()).finally(() => {
-      this.running = null;
-    });
+    if (this.running === null) {
+      // Publish the running state synchronously. API callers can now start a
+      // full refresh and receive an immediate acknowledgement instead of
+      // holding an HTTP request open while every native history is read.
+      this.current = {
+        state: "running",
+        startedAt: this.now().toISOString(),
+        completedAt: null,
+        providers: this.readers.map((reader) => ({
+          ...emptyProviderStatus(reader.provider),
+          state: "running"
+        }))
+      };
+      this.running = this.enqueue(() => this.run()).finally(() => {
+        this.running = null;
+      });
+    }
     return this.running;
   }
 
@@ -192,21 +206,20 @@ export class HistorySyncService {
       status.state = "failed";
       status.error = errorMessage(error);
     }
-    const existing = this.current.providers.findIndex((candidate) => candidate.provider === reader.provider);
-    if (existing === -1) this.current.providers.push(status);
-    else this.current.providers[existing] = status;
-    this.current.state = aggregateState(this.current.providers);
-    this.current.startedAt ??= this.now().toISOString();
-    this.current.completedAt = this.now().toISOString();
+    // A queued full refresh owns the public status from the moment it is
+    // accepted. Do not let an older incremental operation briefly overwrite
+    // that status with "complete" before the full refresh has actually run.
+    if (this.running === null) {
+      const existing = this.current.providers.findIndex((candidate) => candidate.provider === reader.provider);
+      if (existing === -1) this.current.providers.push(status);
+      else this.current.providers[existing] = status;
+      this.current.state = aggregateState(this.current.providers);
+      this.current.startedAt ??= this.now().toISOString();
+      this.current.completedAt = this.now().toISOString();
+    }
   }
 
   private async run(): Promise<HistoryImportStatus> {
-    this.current = {
-      state: "running",
-      startedAt: this.now().toISOString(),
-      completedAt: null,
-      providers: this.readers.map((reader) => ({ ...emptyProviderStatus(reader.provider), state: "running" }))
-    };
     for (const reader of this.readers) {
       const status = this.current.providers.find((candidate) => candidate.provider === reader.provider);
       if (status === undefined) continue;

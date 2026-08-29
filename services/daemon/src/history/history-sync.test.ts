@@ -143,6 +143,31 @@ describe("HistorySyncService", () => {
     expect(store.listHistorySources("codex")).toHaveLength(2);
   });
 
+  it("publishes running status before a full history refresh completes", async () => {
+    const store = new CanonicalStore(":memory:");
+    stores.push(store);
+    let release: (() => void) | undefined;
+    const blocked = new Promise<void>((resolve) => { release = resolve; });
+    const reader: HistoryReader = {
+      provider: "claude",
+      readHistory: async () => {
+        await blocked;
+        return [];
+      }
+    };
+    const sync = new HistorySyncService(store, [reader]);
+
+    const completion = sync.syncAll();
+    expect(sync.status()).toMatchObject({
+      state: "running",
+      completedAt: null,
+      providers: [{ provider: "claude", state: "running" }]
+    });
+
+    release?.();
+    await expect(completion).resolves.toMatchObject({ state: "complete" });
+  });
+
   it("debounces native file changes and imports only the changed thread", async () => {
     const store = new CanonicalStore(":memory:");
     stores.push(store);

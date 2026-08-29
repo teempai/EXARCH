@@ -386,6 +386,7 @@ final class DesktopClientModel: ObservableObject {
                         try await self.refreshConversationIndex()
                         if !Self.importIsRunning(self.historyImportStatus) {
                             self.awaitingInitialHistoryImport = false
+                            try await self.refreshProviderSnapshots()
                             if self.activeConversation == nil,
                                let first = (self.pinnedConversations + self.unpinnedConversations).first {
                                 await self.select(first)
@@ -678,11 +679,9 @@ final class DesktopClientModel: ObservableObject {
                 input: EmptyRequest(),
                 as: DesktopHistoryImportStatus.self
             )
-            try await refreshProviderSnapshots()
-            try await refreshConversationIndex()
-            if activeConversation == nil, let first = (pinnedConversations + unpinnedConversations).first {
-                await select(first)
-            }
+            // The daemon accepted the scan. Poll its status while the native
+            // histories are imported instead of holding this request open.
+            awaitingInitialHistoryImport = true
             lastSyncError = nil
         } catch {
             errorMessage = "Harness scan did not complete. \(describe(error))"
