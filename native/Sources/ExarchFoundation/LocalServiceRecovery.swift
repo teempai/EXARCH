@@ -3,10 +3,9 @@ import Foundation
 #if os(macOS)
 import Darwin
 
-/// Restores a stopped local daemon without asking the user to operate
-/// Keychain Access. Secret bytes stay inside this process: the foreground app
-/// asks macOS for access, wipes each temporary buffer, and then restarts the
-/// fixed launchd service.
+/// Restores a stopped or unregistered local daemon without touching daemon
+/// credentials. The foreground app only asks launchd to bootstrap and restart
+/// the fixed per-user service installed by EXARCH.
 public struct LocalServiceRecovery: Sendable {
     private let applicationSupport: URL
 

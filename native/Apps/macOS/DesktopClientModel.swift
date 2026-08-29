@@ -79,6 +79,8 @@ final class DesktopClientModel: ObservableObject {
 
     @Published var showNewConversation = false
     @Published var showUnpairConfirmation = false
+    @Published var projectPendingEnrollment: Project?
+    @Published private(set) var enrollingProjectID: String?
     @Published var newConversationTitle = ""
     @Published var selectedProjectID: String?
 
@@ -100,6 +102,7 @@ final class DesktopClientModel: ObservableObject {
     private var cachedConversationEvents: [CanonicalEvent] = []
     private var activeTurnConversationID: String?
     private var userRequestedInterrupt = false
+    private var startupGate = DesktopStartupGate()
 
     private static let initialMessageCount = 30
     private static let threadPageSize = 30
@@ -171,6 +174,16 @@ final class DesktopClientModel: ObservableObject {
 
     var enrolledProjects: [Project] { projects.filter { !$0.allowedPaths.isEmpty } }
 
+    var activeProject: Project? {
+        guard let projectID = activeConversation?.projectId else { return nil }
+        return projects.first { $0.id == projectID }
+    }
+
+    var activeBrowseOnlyProject: Project? {
+        guard let project = activeProject, project.allowedPaths.isEmpty else { return nil }
+        return project
+    }
+
     var initialHistoryImportRunning: Bool {
         awaitingInitialHistoryImport
     }
@@ -191,11 +204,20 @@ final class DesktopClientModel: ObservableObject {
         guard phase == .starting else { return }
         do {
             guard let status = try DaemonRuntimeStatus.read(dataDirectory: dataDirectory),
-                  status.isOnline,
-                  let base = status.apiBaseUrl.flatMap(URL.init(string:))
-            else {
-                phase = .daemonOffline
+                  status.isOnline else {
+                switch startupGate.actionForOfflineService() {
+                case .restoreService:
+                    repairingLocalService = true
+                    defer { repairingLocalService = false }
+                    try await serviceRecovery.restore()
+                    await start()
+                case .showOffline:
+                    phase = .daemonOffline
+                }
                 return
+            }
+            guard let base = status.apiBaseUrl.flatMap(URL.init(string:)) else {
+                throw ExarchError.unavailable("The local service reported an invalid loopback address")
             }
 
             let signing: any P256PayloadSigner
@@ -261,9 +283,11 @@ final class DesktopClientModel: ObservableObject {
             )
             awaitingInitialHistoryImport = conversations.isEmpty
             identityRepairRequired = false
+            try await refreshAllAuthoritatively(prefetchMessages: false)
+            startupGate.recordAuthoritativeRefresh()
             phase = .ready
-            await refreshAll()
             startPolling()
+            await prefetchRecentMessages(for: conversations)
         } catch {
             phase = .failed(describe(error))
         }
@@ -271,6 +295,7 @@ final class DesktopClientModel: ObservableObject {
 
     func retry() {
         pollTask?.cancel()
+        startupGate = DesktopStartupGate()
         phase = .starting
         Task { await start() }
     }
@@ -325,6 +350,7 @@ final class DesktopClientModel: ObservableObject {
         Task {
             do {
                 try await serviceRecovery.restore()
+                startupGate = DesktopStartupGate()
                 phase = .starting
                 repairingLocalService = false
                 await start()
@@ -377,30 +403,35 @@ final class DesktopClientModel: ObservableObject {
     // MARK: - Loading
 
     func refreshAll() async {
-        guard let api else { return }
         do {
-            projects = try await api.get("/api/v1/projects", as: [Project].self)
-                .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
-            snapshots = try await api.get("/api/v1/providers", as: [ProviderSnapshot].self)
-            try await refreshHistoryStatus()
-            try await refreshLoadedThreadWindow()
-            try await migrateLegacyPins(using: api)
-            awaitingInitialHistoryImport = conversations.isEmpty && Self.importIsRunning(historyImportStatus)
-            knownDevices = try await enrollment.listDevices()
-            if !enrolledProjects.contains(where: { $0.id == selectedProjectID }) {
-                selectedProjectID = enrolledProjects.first?.id
-            }
-            if !awaitingInitialHistoryImport,
-               activeConversation == nil,
-               let first = (pinnedConversations + unpinnedConversations).first {
-                await select(first)
-            } else {
-                updatePolicyLabel()
-            }
+            try await refreshAllAuthoritatively(prefetchMessages: true)
             lastSyncError = nil
         } catch {
             lastSyncError = describe(error)
         }
+    }
+
+    private func refreshAllAuthoritatively(prefetchMessages: Bool) async throws {
+        guard let api else { throw ExarchError.unavailable("Local service is unavailable") }
+        projects = try await api.get("/api/v1/projects", as: [Project].self)
+            .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+        snapshots = try await api.get("/api/v1/providers", as: [ProviderSnapshot].self)
+        try await refreshHistoryStatus()
+        try await refreshLoadedThreadWindow(prefetchMessages: prefetchMessages)
+        try await migrateLegacyPins(using: api)
+        awaitingInitialHistoryImport = conversations.isEmpty && Self.importIsRunning(historyImportStatus)
+        knownDevices = try await enrollment.listDevices()
+        if !enrolledProjects.contains(where: { $0.id == selectedProjectID }) {
+            selectedProjectID = enrolledProjects.first?.id
+        }
+        if !awaitingInitialHistoryImport,
+           activeConversation == nil,
+           let first = (pinnedConversations + unpinnedConversations).first {
+            await select(first)
+        } else {
+            updatePolicyLabel()
+        }
+        lastSyncError = nil
     }
 
     func select(_ conversation: Conversation) async {
@@ -662,7 +693,7 @@ final class DesktopClientModel: ObservableObject {
         try await refreshLoadedThreadWindow()
     }
 
-    private func refreshLoadedThreadWindow() async throws {
+    private func refreshLoadedThreadWindow(prefetchMessages: Bool = true) async throws {
         guard api != nil else { throw ExarchError.unavailable("Local service is unavailable") }
         let targetCount = max(Self.threadPageSize, conversations.count)
         let previousVisible = conversations
@@ -705,7 +736,7 @@ final class DesktopClientModel: ObservableObject {
             activeConversation = refreshedActive
         }
         persistIndex()
-        await prefetchRecentMessages(for: conversations)
+        if prefetchMessages { await prefetchRecentMessages(for: conversations) }
     }
 
     private func fetchThreadPage(after cursor: String?) async throws -> ConversationListPage {
@@ -907,9 +938,49 @@ final class DesktopClientModel: ObservableObject {
 
     // MARK: - Actions
 
+    func requestActiveProjectEnrollment() {
+        guard let project = activeBrowseOnlyProject, enrollingProjectID == nil else { return }
+        projectPendingEnrollment = project
+    }
+
+    func enrollPendingProject() {
+        guard let project = projectPendingEnrollment,
+              project.allowedPaths.isEmpty,
+              enrollingProjectID == nil,
+              let api else { return }
+        enrollingProjectID = project.id
+        Task {
+            do {
+                try await authenticateUser(
+                    reason: "Allow EXARCH agent harnesses to work in \(project.repoRoot)."
+                )
+                try await enrollment.enrollProject(project)
+                projects = try await api.get("/api/v1/projects", as: [Project].self)
+                    .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+                guard let confirmed = projects.first(where: { $0.id == project.id }),
+                      confirmed.allowedPaths == [project.repoRoot] else {
+                    throw ExarchError.unavailable(
+                        "The local service did not confirm the exact project scope"
+                    )
+                }
+                selectedProjectID = project.id
+                projectPendingEnrollment = nil
+                lastSyncError = nil
+                persistIndex()
+            } catch {
+                errorMessage = "Project enrollment was not completed. \(describe(error))"
+            }
+            enrollingProjectID = nil
+        }
+    }
+
     func send() {
         let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty, !busy, let api, let conversation = activeConversation else { return }
+        if let project = activeBrowseOnlyProject {
+            projectPendingEnrollment = project
+            return
+        }
         guard availableProviders.contains(provider) else {
             errorMessage = providerUnavailableMessage(provider)
             return

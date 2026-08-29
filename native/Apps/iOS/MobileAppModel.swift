@@ -89,6 +89,13 @@ final class MobileAppModel: ObservableObject {
     var enrolledProjects: [Project] {
         projects.filter { !$0.allowedPaths.isEmpty }
     }
+
+    var activeBrowseOnlyProject: Project? {
+        guard let projectID = activeConversation?.projectId,
+              let project = projects.first(where: { $0.id == projectID }),
+              project.allowedPaths.isEmpty else { return nil }
+        return project
+    }
     let voice = VoiceSessionController()
 
     private let secureStore = KeychainStore()
@@ -263,6 +270,10 @@ final class MobileAppModel: ObservableObject {
     func send() {
         let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty, let conversation = activeConversation, let api, !busy else { return }
+        if let project = activeBrowseOnlyProject {
+            errorMessage = "This imported thread is browse-only. Open EXARCH Desktop and enroll \(project.repoRoot) before sending a message."
+            return
+        }
         guard availableProviders.contains(provider) else {
             errorMessage = providerUnavailableMessage(provider)
             return

@@ -182,6 +182,48 @@ public struct LocalDeviceEnrollment: Sendable {
         else { throw ExarchError.unavailable("Pairing removal was not confirmed") }
     }
 
+    /// Grants execution scope to an imported browse-only project using only
+    /// the exact project identity and path already recorded by the daemon.
+    /// The desktop caller obtains local owner authentication before invoking
+    /// this; no relay or mobile API can reach this command.
+    public func enrollProject(_ project: Project) async throws {
+        guard project.allowedPaths.isEmpty else { return }
+        var arguments = [
+            "project-add",
+            "--name", project.name,
+            "--repo-root", project.repoRoot
+        ]
+        if let configPath { arguments.append(contentsOf: ["--config", configPath.path]) }
+
+        let output = try await run(arguments)
+        guard let enrolled = output
+            .split(separator: "\n")
+            .compactMap({ try? JSONDecoder().decode(ProjectAddedEvent.self, from: Data($0.utf8)) })
+            .first(where: { $0.event == "project.added" }),
+              Self.confirmsExactProjectEnrollment(
+                expected: project,
+                id: enrolled.id,
+                repoRoot: enrolled.repoRoot,
+                allowedPaths: enrolled.allowedPaths
+              )
+        else {
+            throw ExarchError.unavailable(
+                "Project enrollment did not confirm the exact recorded directory"
+            )
+        }
+    }
+
+    static func confirmsExactProjectEnrollment(
+        expected project: Project,
+        id: String,
+        repoRoot: String,
+        allowedPaths: [String]
+    ) -> Bool {
+        id == project.id
+            && repoRoot == project.repoRoot
+            && allowedPaths == [project.repoRoot]
+    }
+
     private struct DevicesEvent: Decodable {
         let event: String
         let devices: [KnownDevice]
@@ -197,6 +239,13 @@ public struct LocalDeviceEnrollment: Sendable {
     private struct UnpairEvent: Decodable {
         let event: String
         let contextPreserved: Bool
+    }
+
+    private struct ProjectAddedEvent: Decodable {
+        let event: String
+        let id: String
+        let repoRoot: String
+        let allowedPaths: [String]
     }
 
     /// Runs the CLI and collects its output.

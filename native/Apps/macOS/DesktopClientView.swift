@@ -47,6 +47,9 @@ struct DesktopClientView: View {
         .sheet(item: $model.pendingApproval) { approval in approvalSheet(approval) }
         .sheet(isPresented: $model.showNewConversation) { newConversationSheet }
         .sheet(isPresented: $model.showUnpairConfirmation) { unpairSheet }
+        .sheet(item: $model.projectPendingEnrollment) { project in
+            projectEnrollmentSheet(project)
+        }
         .sheet(isPresented: $showingPairing) { DesktopRootView(model: onboarding) }
         .sheet(isPresented: $showingSettings) { desktopSettingsSheet }
         .onChange(of: onboarding.pairingConfigured) { _, paired in
@@ -423,40 +426,70 @@ struct DesktopClientView: View {
     // MARK: - Conversation
 
     private var conversation: some View {
-        FocusFlowConversationView(
-            title: model.activeConversation?.title ?? "Conversation",
-            provider: Binding(get: { model.provider }, set: { model.selectProvider($0) }),
-            modelName: $model.modelName,
-            policyLabel: model.policyLabel,
-            policyDetails: model.policyDetails,
-            capacity: model.currentCapacity,
-            models: model.availableModels,
-            messages: model.displayedMessages,
-            historyError: model.conversationLoadError,
-            isLoadingMessages: model.isLoadingMessages,
-            isLoadingOlderMessages: model.isLoadingOlderMessages,
-            canLoadOlderMessages: model.canLoadOlderMessages,
-            availableProviders: model.availableProviders,
-            fallbackRoute: model.activeConversation?.fallbackRoute ?? [model.provider],
-            voiceStatus: "",
-            voiceTranscript: "",
-            voiceEnabled: $model.voiceEnabled,
-            draft: $model.draft,
-            busy: model.busy,
-            interrupting: model.interrupting,
-            turnStatus: model.turnStatus,
-            messageFontSize: 12,
-            transcriptMaxWidth: 640,
-            usesMinimalComposer: true,
-            supportsVoice: false,
-            send: model.send,
-            interrupt: model.interrupt,
-            toggleVoice: { _ in },
-            stopVoice: {},
-            loadOlderMessages: model.loadOlderMessages,
-            retryMessages: model.retryConversationMessages,
-            setFallbackRoute: model.setFallbackRoute
-        )
+        VStack(spacing: 0) {
+            if let project = model.activeBrowseOnlyProject {
+                browseOnlyProjectBanner(project)
+            }
+            FocusFlowConversationView(
+                title: model.activeConversation?.title ?? "Conversation",
+                provider: Binding(get: { model.provider }, set: { model.selectProvider($0) }),
+                modelName: $model.modelName,
+                policyLabel: model.policyLabel,
+                policyDetails: model.policyDetails,
+                capacity: model.currentCapacity,
+                models: model.availableModels,
+                messages: model.displayedMessages,
+                historyError: model.conversationLoadError,
+                isLoadingMessages: model.isLoadingMessages,
+                isLoadingOlderMessages: model.isLoadingOlderMessages,
+                canLoadOlderMessages: model.canLoadOlderMessages,
+                availableProviders: model.availableProviders,
+                fallbackRoute: model.activeConversation?.fallbackRoute ?? [model.provider],
+                voiceStatus: "",
+                voiceTranscript: "",
+                voiceEnabled: $model.voiceEnabled,
+                draft: $model.draft,
+                busy: model.busy,
+                interrupting: model.interrupting,
+                turnStatus: model.turnStatus,
+                messageFontSize: 12,
+                transcriptMaxWidth: 640,
+                usesMinimalComposer: true,
+                supportsVoice: false,
+                send: model.send,
+                interrupt: model.interrupt,
+                toggleVoice: { _ in },
+                stopVoice: {},
+                loadOlderMessages: model.loadOlderMessages,
+                retryMessages: model.retryConversationMessages,
+                setFallbackRoute: model.setFallbackRoute
+            )
+        }
+    }
+
+    private func browseOnlyProjectBanner(_ project: Project) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: "folder.badge.questionmark")
+                .foregroundStyle(FocusFlowTheme.attention)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Browse-only project")
+                    .font(.caption.weight(.semibold))
+                Text(project.repoRoot)
+                    .font(.caption2.monospaced())
+                    .foregroundStyle(FocusFlowTheme.secondaryInk)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                    .help(project.repoRoot)
+            }
+            Spacer(minLength: 8)
+            Button("Enroll this project") { model.requestActiveProjectEnrollment() }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 9)
+        .background(FocusFlowTheme.surface)
+        .overlay(alignment: .bottom) { Divider() }
     }
 
     private func capacityActionLabel(_ provider: Provider) -> String {
@@ -623,6 +656,41 @@ struct DesktopClientView: View {
         .padding(22)
         .frame(width: 470)
         .background(FocusFlowTheme.canvas)
+    }
+
+    private func projectEnrollmentSheet(_ project: Project) -> some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Label("Enroll this project?", systemImage: "folder.badge.gearshape")
+                .font(.title3.weight(.semibold))
+            Text("This imported thread is currently browse-only. Enrolling grants local agent harnesses access to exactly this recorded directory:")
+                .font(.callout)
+            Text(project.repoRoot)
+                .font(.system(.callout, design: .monospaced))
+                .textSelection(.enabled)
+                .padding(10)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(FocusFlowTheme.surface, in: RoundedRectangle(cornerRadius: 8))
+                .overlay(RoundedRectangle(cornerRadius: 8).stroke(FocusFlowTheme.border))
+            Text("Your harness approval and sandbox policies remain unchanged. Only this Mac can grant project scope; the phone and relay cannot.")
+                .font(.footnote)
+                .foregroundStyle(FocusFlowTheme.secondaryInk)
+            HStack {
+                Spacer()
+                Button("Cancel") { model.projectPendingEnrollment = nil }
+                    .disabled(model.enrollingProjectID != nil)
+                if model.enrollingProjectID == project.id {
+                    ProgressView("Enrolling…")
+                        .controlSize(.small)
+                } else {
+                    Button("Enroll project") { model.enrollPendingProject() }
+                        .buttonStyle(.prominentBrass)
+                }
+            }
+        }
+        .padding(22)
+        .frame(width: 520)
+        .background(FocusFlowTheme.canvas)
+        .interactiveDismissDisabled(model.enrollingProjectID != nil)
     }
 
 }

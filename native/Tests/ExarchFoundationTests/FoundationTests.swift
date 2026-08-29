@@ -5,6 +5,17 @@ import Testing
 
 @Suite("Exarch native foundation")
 struct FoundationTests {
+    @Test("desktop startup restores once and waits for an authoritative refresh")
+    func desktopStartupGate() {
+        var gate = DesktopStartupGate()
+        #expect(!gate.mayPresentServiceState)
+        #expect(gate.actionForOfflineService() == .restoreService)
+        #expect(gate.actionForOfflineService() == .showOffline)
+        #expect(!gate.mayPresentServiceState)
+        gate.recordAuthoritativeRefresh()
+        #expect(gate.mayPresentServiceState)
+    }
+
     @Test("harness discovery includes ChatGPT's bundled Codex and matches daemon locations")
     func harnessExecutableCandidates() {
         let home = URL(fileURLWithPath: "/Users/example")
