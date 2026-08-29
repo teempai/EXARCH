@@ -128,6 +128,7 @@ export interface EventQuery {
   type?: EventType;
   provider?: Provider;
   displayOnly?: boolean;
+  activeImportsOnly?: boolean;
 }
 
 export interface SearchResult {
@@ -1318,8 +1319,48 @@ export class CanonicalStore {
           | { canonical_event_id: string; content_digest: string }
           | undefined;
         if (existing?.content_digest === item.contentDigest) {
+          // Provider CLIs persist the same turn that EXARCH is recording
+          // canonically. A file watcher may therefore see a native copy after
+          // the live event already exists. Relink older duplicate imports to
+          // that live event so message views and future context see one turn.
+          const mirror = this.findLiveHistoryMirror(
+            sourceRow.id,
+            conversation.id,
+            input.provider,
+            item,
+            itemPayload
+          );
+          if (mirror !== undefined && mirror.id !== existing.canonical_event_id) {
+            this.database
+              .prepare(
+                `UPDATE imported_items
+                    SET canonical_event_id = ?, imported_at = ?
+                  WHERE history_source_id = ? AND native_item_id = ?`
+              )
+              .run(mirror.id, now, sourceRow.id, item.nativeItemId);
+          }
           unchanged += 1;
           continue;
+        }
+        if (existing === undefined) {
+          const mirror = this.findLiveHistoryMirror(
+            sourceRow.id,
+            conversation.id,
+            input.provider,
+            item,
+            itemPayload
+          );
+          if (mirror !== undefined) {
+            this.database
+              .prepare(
+                `INSERT INTO imported_items(
+                   history_source_id, native_item_id, canonical_event_id, content_digest, imported_at
+                 ) VALUES (?, ?, ?, ?, ?)`
+              )
+              .run(sourceRow.id, item.nativeItemId, mirror.id, item.contentDigest, now);
+            unchanged += 1;
+            continue;
+          }
         }
         const event = this.appendEventInternal({
           conversationId: conversation.id,
@@ -1395,6 +1436,55 @@ export class CanonicalStore {
         unchanged
       };
     })();
+  }
+
+  /**
+   * Finds the live canonical message represented by a newly persisted native
+   * history item. Matching is deliberately narrow: only user/assistant text,
+   * the same provider, a live turn ID, exact redacted text, and a nearby
+   * provider timestamp. The import ledger makes each live event match at most
+   * one native item for this source.
+   */
+  private findLiveHistoryMirror(
+    historySourceId: string,
+    conversationId: string,
+    provider: Provider,
+    item: HistoryImportItem,
+    payload: Record<string, unknown>
+  ): EventRow | undefined {
+    if (!["user.message", "assistant.message.completed"].includes(item.type)) return undefined;
+    if (typeof payload.text !== "string") return undefined;
+    const occurredAt = Date.parse(item.occurredAt);
+    if (!Number.isFinite(occurredAt)) return undefined;
+    const candidates = this.database
+      .prepare(
+        `SELECT events.* FROM events
+          WHERE events.conversation_id = ?
+            AND events.provider = ?
+            AND events.type = ?
+            AND events.turn_id IS NOT NULL
+            AND NOT EXISTS (
+              SELECT 1 FROM imported_items
+               WHERE history_source_id = ?
+                 AND canonical_event_id = events.id
+            )
+          ORDER BY events.sequence ASC`
+      )
+      .all(conversationId, provider, item.type, historySourceId) as EventRow[];
+    return candidates
+      .filter((candidate) => {
+        const candidatePayload = JSON.parse(candidate.payload_json) as Record<string, unknown>;
+        const candidateTime = Date.parse(candidate.occurred_at);
+        return candidatePayload.imported !== true
+          && candidatePayload.text === payload.text
+          && Number.isFinite(candidateTime)
+          && Math.abs(candidateTime - occurredAt) <= 60_000;
+      })
+      .sort((left, right) => {
+        const leftDistance = Math.abs(Date.parse(left.occurred_at) - occurredAt);
+        const rightDistance = Math.abs(Date.parse(right.occurred_at) - occurredAt);
+        return leftDistance - rightDistance || left.sequence - right.sequence;
+      })[0];
   }
 
   setActiveProvider(conversationId: string, provider: Provider): ConversationRecord {
@@ -1496,6 +1586,9 @@ export class CanonicalStore {
       conditions.push("type IN (?, ?, ?)");
       values.push("user.message", "assistant.message.completed", "provider.handoff.completed");
     }
+    if (query.displayOnly === true || query.activeImportsOnly === true) {
+      conditions.push(activeImportedEventCondition());
+    }
     values.push(limit);
     const rows = this.database
       .prepare(
@@ -1525,6 +1618,9 @@ export class CanonicalStore {
     if (query.displayOnly === true) {
       conditions.push("type IN (?, ?, ?)");
       values.push("user.message", "assistant.message.completed", "provider.handoff.completed");
+    }
+    if (query.displayOnly === true || query.activeImportsOnly === true) {
+      conditions.push(activeImportedEventCondition());
     }
     values.push(limit);
     const rows = this.database
@@ -1567,6 +1663,7 @@ export class CanonicalStore {
           WHERE events_fts MATCH ?
             AND events_fts.project_id = ?
             AND events_fts.conversation_id = ?
+            AND ${activeImportedEventCondition("e")}
           ORDER BY rank
           LIMIT ?`
       )
@@ -2252,6 +2349,14 @@ function historySourceFromRow(row: HistorySourceRow): HistorySourceRecord {
 function compareHistoryItems(left: HistoryImportItem, right: HistoryImportItem): number {
   const time = Date.parse(left.occurredAt) - Date.parse(right.occurredAt);
   return time === 0 ? left.nativeItemId.localeCompare(right.nativeItemId) : time;
+}
+
+function activeImportedEventCondition(alias = "events"): string {
+  // Corrections and native mirrors remain in the immutable event chain, but
+  // only the import-ledger target is the active representation shown in chat.
+  return `(json_extract(${alias}.payload_json, '$.imported') IS NOT 1 OR EXISTS (
+    SELECT 1 FROM imported_items WHERE canonical_event_id = ${alias}.id
+  ))`;
 }
 
 function workspaceLeaseFromRow(row: WorkspaceLeaseRow, now: Date): WorkspaceLeaseRecord {

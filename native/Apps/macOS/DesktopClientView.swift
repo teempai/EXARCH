@@ -54,6 +54,15 @@ struct DesktopClientView: View {
         .sheet(isPresented: $showingSettings) { desktopSettingsSheet }
         .onChange(of: onboarding.pairingConfigured) { _, paired in
             guard paired else { return }
+            switch model.phase {
+            case .daemonOffline, .failed:
+                break
+            case .starting, .ready:
+                // Startup already owns the connection attempt. Launching a
+                // second one here used to race the first authoritative read
+                // and briefly expose the Reconnect screen.
+                return
+            }
             Task {
                 try? await Task.sleep(for: .seconds(2))
                 model.retry()

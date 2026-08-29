@@ -886,9 +886,11 @@ final class MobileAppModel: ObservableObject {
         let existingEvents = Set(self.events.map(\.id))
         self.events += events.filter { !existingEvents.contains($0.id) }
         self.events.sort { $0.sequence < $1.sequence }
-        let existingMessages = Set(messages.map(\.id))
-        messages += ConversationProjection.messages(from: events).filter { !existingMessages.contains($0.id) }
-        messages.sort { $0.sequence < $1.sequence }
+        // Re-project the visible window as a whole. Besides making identity
+        // reconciliation deterministic, this lets the projection collapse a
+        // native-history mirror against the live event already on screen.
+        messages = ConversationProjection.messages(from: self.events)
+            .sorted { $0.sequence < $1.sequence }
     }
 
     private func mergeIntoCache(_ events: [CanonicalEvent]) {

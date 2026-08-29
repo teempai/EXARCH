@@ -218,6 +218,36 @@ struct FoundationTests {
         #expect(ConversationProjection.messages(from: [canonical]).first?.clientMessageID == "message_local_1")
     }
 
+    @Test("native history mirrors do not duplicate a live EXARCH reply")
+    func nativeHistoryMirrorProjection() {
+        let live = CanonicalEvent(
+            id: "event_live",
+            conversationId: "conversation_1",
+            turnId: "turn_1",
+            sequence: 20,
+            type: "assistant.message.completed",
+            provider: .claude,
+            payload: ["text": .string("One answer")],
+            previousHash: "sha256:previous",
+            eventHash: "sha256:live",
+            occurredAt: "2026-08-29T19:27:29.000Z"
+        )
+        let importedMirror = CanonicalEvent(
+            id: "event_imported",
+            conversationId: "conversation_1",
+            turnId: nil,
+            sequence: 24,
+            type: "assistant.message.completed",
+            provider: .claude,
+            payload: ["text": .string("One answer"), "imported": .bool(true)],
+            previousHash: "sha256:live",
+            eventHash: "sha256:imported",
+            occurredAt: "2026-08-29T19:27:29.095Z"
+        )
+
+        #expect(ConversationProjection.messages(from: [live, importedMirror]).map(\.id) == ["event_live"])
+    }
+
     @Test("libp2p identities and signed Noise payloads are self-authenticating")
     func libP2PIdentityAndNoisePayload() throws {
         let seed = Data(0..<32)
