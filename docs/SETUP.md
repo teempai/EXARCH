@@ -158,7 +158,10 @@ broaden this path. EXARCH application state under
 `~/Library/Application Support/EXARCH` remains forbidden as a project, while an
 ordinary source repository named `EXARCH` is allowed. The authenticated
 `GET /api/v1/history-import/status` endpoint reports per-provider results;
-`POST /api/v1/history-import/refresh` performs an explicit full refresh.
+`POST /api/v1/history-import/refresh` accepts an explicit full refresh with
+HTTP 202 and returns its initial running status. Clients poll the status endpoint
+until the laptop reports `complete`, `partial`, or `failed`, so large native
+histories do not hold a relay or loopback request open.
 
 ## Operation and removal
 

@@ -40,6 +40,7 @@ export interface HistoryMonitoringOptions {
 const DEFAULT_DEBOUNCE_MS = 2_000;
 const DEFAULT_RECONCILIATION_INTERVAL_MS = 5 * 60_000;
 const DEFAULT_STALE_CHECK_INTERVAL_MS = 10_000;
+const DATABASE_BUSY_RETRY_DELAYS_MS = [50, 150, 500] as const;
 
 export class HistorySyncService {
   private running: Promise<HistoryImportStatus> | null = null;
@@ -73,9 +74,23 @@ export class HistorySyncService {
   }
 
   syncAll(): Promise<HistoryImportStatus> {
-    this.running ??= this.enqueue(() => this.run()).finally(() => {
-      this.running = null;
-    });
+    if (this.running === null) {
+      // Publish the running state synchronously. API callers can now start a
+      // full refresh and receive an immediate acknowledgement instead of
+      // holding an HTTP request open while every native history is read.
+      this.current = {
+        state: "running",
+        startedAt: this.now().toISOString(),
+        completedAt: null,
+        providers: this.readers.map((reader) => ({
+          ...emptyProviderStatus(reader.provider),
+          state: "running"
+        }))
+      };
+      this.running = this.enqueue(() => this.run()).finally(() => {
+        this.running = null;
+      });
+    }
     return this.running;
   }
 
@@ -170,7 +185,7 @@ export class HistorySyncService {
       for (const thread of threads) {
         status.discovered += 1;
         try {
-          const result = this.importThread(thread);
+          const result = await this.importThreadWithBusyRetry(thread);
           status.imported += 1;
           status.insertedItems += result.inserted;
           status.correctedItems += result.corrected;
@@ -192,21 +207,20 @@ export class HistorySyncService {
       status.state = "failed";
       status.error = errorMessage(error);
     }
-    const existing = this.current.providers.findIndex((candidate) => candidate.provider === reader.provider);
-    if (existing === -1) this.current.providers.push(status);
-    else this.current.providers[existing] = status;
-    this.current.state = aggregateState(this.current.providers);
-    this.current.startedAt ??= this.now().toISOString();
-    this.current.completedAt = this.now().toISOString();
+    // A queued full refresh owns the public status from the moment it is
+    // accepted. Do not let an older incremental operation briefly overwrite
+    // that status with "complete" before the full refresh has actually run.
+    if (this.running === null) {
+      const existing = this.current.providers.findIndex((candidate) => candidate.provider === reader.provider);
+      if (existing === -1) this.current.providers.push(status);
+      else this.current.providers[existing] = status;
+      this.current.state = aggregateState(this.current.providers);
+      this.current.startedAt ??= this.now().toISOString();
+      this.current.completedAt = this.now().toISOString();
+    }
   }
 
   private async run(): Promise<HistoryImportStatus> {
-    this.current = {
-      state: "running",
-      startedAt: this.now().toISOString(),
-      completedAt: null,
-      providers: this.readers.map((reader) => ({ ...emptyProviderStatus(reader.provider), state: "running" }))
-    };
     for (const reader of this.readers) {
       const status = this.current.providers.find((candidate) => candidate.provider === reader.provider);
       if (status === undefined) continue;
@@ -215,7 +229,7 @@ export class HistorySyncService {
         for await (const thread of threads) {
           status.discovered += 1;
           try {
-            const result = this.importThread(thread);
+            const result = await this.importThreadWithBusyRetry(thread);
             status.imported += 1;
             status.insertedItems += result.inserted;
             status.correctedItems += result.corrected;
@@ -323,6 +337,18 @@ export class HistorySyncService {
       items
     });
   }
+
+  private async importThreadWithBusyRetry(thread: NativeHistoryThread) {
+    for (let attempt = 0; ; attempt += 1) {
+      try {
+        return this.importThread(thread);
+      } catch (error) {
+        const delayMs = DATABASE_BUSY_RETRY_DELAYS_MS[attempt];
+        if (delayMs === undefined || !isDatabaseBusy(error)) throw error;
+        await new Promise<void>((resolve) => setTimeout(resolve, delayMs));
+      }
+    }
+  }
 }
 
 function aggregateState(providers: ProviderImportStatus[]): HistoryImportStatus["state"] {
@@ -355,4 +381,12 @@ function digest(value: unknown): string {
 
 function errorMessage(error: unknown): string {
   return (error instanceof Error ? error.message : String(error)).slice(0, 2_000);
+}
+
+function isDatabaseBusy(error: unknown): boolean {
+  const code = error !== null && typeof error === "object" && "code" in error
+    ? String(error.code)
+    : "";
+  const message = errorMessage(error).toLowerCase();
+  return code === "SQLITE_BUSY" || message.includes("database is locked");
 }

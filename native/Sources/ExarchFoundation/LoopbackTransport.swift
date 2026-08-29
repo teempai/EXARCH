@@ -30,6 +30,9 @@ public struct DaemonRuntimeStatus: Codable, Equatable, Sendable {
 /// are signed exactly as the phone signs them — the daemon authenticates every
 /// caller as a registered device regardless of how it arrived.
 public actor LoopbackTransport: RemoteRequestTransport {
+    static let ordinaryRequestTimeout: TimeInterval = 30
+    static let longRunningRequestTimeout: TimeInterval = 24 * 60 * 60
+
     private let baseURL: URL
     private let session: URLSession
 
@@ -75,7 +78,7 @@ public actor LoopbackTransport: RemoteRequestTransport {
 
         var request = URLRequest(url: url.absoluteURL)
         request.httpMethod = method
-        request.timeoutInterval = 30
+        request.timeoutInterval = Self.timeoutInterval(for: path)
         for (name, value) in headers { request.setValue(value, forHTTPHeaderField: name) }
         if method == "POST" { request.httpBody = body }
 
@@ -85,5 +88,18 @@ public actor LoopbackTransport: RemoteRequestTransport {
         }
         guard data.count <= 1024 * 1024 else { throw ExarchError.responseTooLarge }
         return (http.statusCode, data)
+    }
+
+    static func timeoutInterval(for path: String) -> TimeInterval {
+        // Message submission currently returns the canonical result after the
+        // provider finishes. Claude, Codex, and Hermes turns routinely exceed
+        // 30 seconds, so the desktop transport must not turn valid work into a
+        // false network failure. History refresh is now asynchronous, but it
+        // remains long-running here for compatibility with older daemons.
+        if path.range(of: #"^/api/v1/conversations/[^/]+/messages$"#, options: .regularExpression) != nil
+            || path == "/api/v1/history-import/refresh" {
+            return longRunningRequestTimeout
+        }
+        return ordinaryRequestTimeout
     }
 }

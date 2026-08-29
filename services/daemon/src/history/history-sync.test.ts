@@ -1,7 +1,7 @@
 import { mkdtempSync, realpathSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { CanonicalStore } from "../../../../packages/core/src/index.js";
 import type { HistoryReader, NativeHistoryThread } from "./types.js";
 import { HistorySyncService } from "./history-sync.js";
@@ -141,6 +141,52 @@ describe("HistorySyncService", () => {
     const status = await new HistorySyncService(store, [reader]).syncAll();
     expect(status.providers[0]).toMatchObject({ state: "complete", discovered: 2, imported: 2 });
     expect(store.listHistorySources("codex")).toHaveLength(2);
+  });
+
+  it("publishes running status before a full history refresh completes", async () => {
+    const store = new CanonicalStore(":memory:");
+    stores.push(store);
+    let release: (() => void) | undefined;
+    const blocked = new Promise<void>((resolve) => { release = resolve; });
+    const reader: HistoryReader = {
+      provider: "claude",
+      readHistory: async () => {
+        await blocked;
+        return [];
+      }
+    };
+    const sync = new HistorySyncService(store, [reader]);
+
+    const completion = sync.syncAll();
+    expect(sync.status()).toMatchObject({
+      state: "running",
+      completedAt: null,
+      providers: [{ provider: "claude", state: "running" }]
+    });
+
+    release?.();
+    await expect(completion).resolves.toMatchObject({ state: "complete" });
+  });
+
+  it("retries a transient SQLite busy failure without making the scan partial", async () => {
+    const store = new CanonicalStore(":memory:");
+    stores.push(store);
+    const originalImport = store.importHistoryThread.bind(store);
+    const importSpy = vi.spyOn(store, "importHistoryThread")
+      .mockImplementationOnce(() => {
+        throw Object.assign(new Error("database is locked"), { code: "SQLITE_BUSY" });
+      })
+      .mockImplementation((input) => originalImport(input));
+    const sync = new HistorySyncService(store, [{
+      provider: "codex",
+      readHistory: async () => [fixtureThread()]
+    }]);
+
+    await expect(sync.syncAll()).resolves.toMatchObject({
+      state: "complete",
+      providers: [{ provider: "codex", state: "complete", imported: 1, failedThreads: 0 }]
+    });
+    expect(importSpy).toHaveBeenCalledTimes(2);
   });
 
   it("debounces native file changes and imports only the changed thread", async () => {

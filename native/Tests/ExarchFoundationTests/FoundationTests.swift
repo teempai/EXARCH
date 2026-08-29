@@ -5,6 +5,19 @@ import Testing
 
 @Suite("Exarch native foundation")
 struct FoundationTests {
+    @Test("loopback transport preserves long-running provider turns")
+    func loopbackRequestTimeouts() {
+        #expect(LoopbackTransport.timeoutInterval(
+            for: "/api/v1/conversations/conv_1/messages"
+        ) == LoopbackTransport.longRunningRequestTimeout)
+        #expect(LoopbackTransport.timeoutInterval(
+            for: "/api/v1/history-import/refresh"
+        ) == LoopbackTransport.longRunningRequestTimeout)
+        #expect(LoopbackTransport.timeoutInterval(
+            for: "/api/v1/providers"
+        ) == LoopbackTransport.ordinaryRequestTimeout)
+    }
+
     @Test("desktop startup restores once and waits for an authoritative refresh")
     func desktopStartupGate() {
         var gate = DesktopStartupGate()

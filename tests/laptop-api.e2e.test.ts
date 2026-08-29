@@ -169,7 +169,12 @@ describe.sequential("laptop API end to end", () => {
     const initialImportStatus = await signedFetch("GET", "/api/v1/history-import/status");
     expect(await initialImportStatus.json()).toMatchObject({ state: "idle", providers: [] });
     const refreshedImportStatus = await signedFetch("POST", "/api/v1/history-import/refresh", {});
-    expect(await refreshedImportStatus.json()).toMatchObject({ state: "complete", providers: [] });
+    expect(refreshedImportStatus.status).toBe(202);
+    expect(await refreshedImportStatus.json()).toMatchObject({ state: "running", providers: [] });
+    await expect.poll(async () => {
+      const status = await signedFetch("GET", "/api/v1/history-import/status");
+      return (await status.json() as { state: string }).state;
+    }).toBe("complete");
 
     const conversationResponse = await signedFetch("POST", "/api/v1/conversations", {
       projectId: project.id,
