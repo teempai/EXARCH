@@ -1,0 +1,51 @@
+{
+  "name": "exarch",
+  "version": "0.1.0",
+  "license": "Apache-2.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "exarch-context": "dist/apps/context-cli/src/main.js",
+    "exarch-daemon": "dist/services/daemon/src/main.js",
+    "exarch-relay": "dist/services/relay/src/main.js",
+    "exarch-setup": "dist/apps/setup-cli/src/main.js"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json && node scripts/copy-runtime-assets.mjs",
+    "build:canonical-json-vectors": "tsx scripts/build-canonical-json-vectors.mjs",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "test:installer": "node scripts/test-install-macos.mjs",
+    "test:native-interop": "swift build --package-path native --product exarch-native-interop && tsx scripts/native-relay-interop.ts",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "context": "tsx apps/context-cli/src/main.ts",
+    "setup": "tsx apps/setup-cli/src/main.ts",
+    "daemon": "tsx services/daemon/src/main.ts",
+    "relay": "tsx services/relay/src/main.ts"
+  },
+  "dependencies": {
+    "@chainsafe/libp2p-noise": "17.0.0",
+    "@libp2p/crypto": "5.1.23",
+    "@libp2p/interface": "3.3.0",
+    "@libp2p/logger": "6.2.13",
+    "@libp2p/peer-id": "6.0.15",
+    "@libp2p/utils": "7.4.0",
+    "better-sqlite3": "npm:better-sqlite3-multiple-ciphers@12.11.1",
+    "uint8arraylist": "3.0.2",
+    "ws": "^8.18.3",
+    "zod": "^4.1.5"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^9.6.0",
+    "@types/node": "^24.3.0",
+    "@types/ws": "^8.18.1",
+    "@vitest/coverage-v8": "^4.1.11",
+    "tsx": "^4.20.5",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.11"
+  }
+}

@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+  <key>CFBundleDisplayName</key><string>EXARCH Service</string>
+  <key>CFBundleExecutable</key><string>EXARCH Service</string>
+  <key>CFBundleIdentifier</key><string>com.teempai.exarch.service</string>
+  <key>CFBundleInfoDictionaryVersion</key><string>6.0</string>
+  <key>CFBundleName</key><string>EXARCH Service</string>
+  <key>CFBundlePackageType</key><string>APPL</string>
+  <key>CFBundleShortVersionString</key><string>1.0</string>
+  <key>CFBundleVersion</key><string>1</string>
+  <key>LSBackgroundOnly</key><true/>
+  <key>LSMinimumSystemVersion</key><string>14.0</string>
+  <key>NSDesktopFolderUsageDescription</key><string>EXARCH accesses Desktop projects only when you choose to use them with an agent harness.</string>
+  <key>NSDocumentsFolderUsageDescription</key><string>EXARCH accesses Documents projects only when you choose to use them with an agent harness.</string>
+  <key>NSDownloadsFolderUsageDescription</key><string>EXARCH accesses Downloads projects only when you choose to use them with an agent harness.</string>
+</dict></plist>

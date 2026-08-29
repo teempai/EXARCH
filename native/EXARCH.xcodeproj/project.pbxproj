@@ -1,0 +1,428 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 60;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		A10000000000000000000001 /* ExarchApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000001 /* ExarchApp.swift */; };
+		A10000000000000000000002 /* MobileAppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000002 /* MobileAppModel.swift */; };
+		A10000000000000000000003 /* MobileRootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000003 /* MobileRootView.swift */; };
+		A10000000000000000000004 /* ExarchFoundation in Frameworks */ = {isa = PBXBuildFile; productRef = A90000000000000000000001 /* ExarchFoundation */; };
+		A10000000000000000000005 /* ExarchUI in Frameworks */ = {isa = PBXBuildFile; productRef = A90000000000000000000002 /* ExarchUI */; };
+		A10000000000000000000006 /* ExarchMacApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000006 /* ExarchMacApp.swift */; };
+		A10000000000000000000007 /* DesktopAppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000007 /* DesktopAppModel.swift */; };
+		A10000000000000000000008 /* DesktopRootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000008 /* DesktopRootView.swift */; };
+		A10000000000000000000009 /* ExarchFoundation in Frameworks */ = {isa = PBXBuildFile; productRef = A90000000000000000000003 /* ExarchFoundation */; };
+		A1000000000000000000000A /* ExarchUI in Frameworks */ = {isa = PBXBuildFile; productRef = A90000000000000000000004 /* ExarchUI */; };
+		A1000000000000000000000B /* PairingQRScanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000000D /* PairingQRScanner.swift */; };
+		A1000000000000000000000C /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000000E /* Assets.xcassets */; };
+		A1000000000000000000000D /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000000F /* Assets.xcassets */; };
+		A1000000000000000000000E /* DesktopClientModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000010 /* DesktopClientModel.swift */; };
+		A1000000000000000000000F /* DesktopClientView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000011 /* DesktopClientView.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		A20000000000000000000001 /* ExarchApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExarchApp.swift; sourceTree = "<group>"; };
+		A20000000000000000000002 /* MobileAppModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileAppModel.swift; sourceTree = "<group>"; };
+		A20000000000000000000003 /* MobileRootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileRootView.swift; sourceTree = "<group>"; };
+		A20000000000000000000004 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		A20000000000000000000005 /* EXARCH.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = EXARCH.entitlements; sourceTree = "<group>"; };
+		A20000000000000000000006 /* ExarchMacApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExarchMacApp.swift; sourceTree = "<group>"; };
+		A20000000000000000000007 /* DesktopAppModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesktopAppModel.swift; sourceTree = "<group>"; };
+		A20000000000000000000008 /* DesktopRootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesktopRootView.swift; sourceTree = "<group>"; };
+		A20000000000000000000009 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		A2000000000000000000000A /* EXARCHMac.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = EXARCHMac.entitlements; sourceTree = "<group>"; };
+		A2000000000000000000000B /* EXARCH.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = EXARCH.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		A2000000000000000000000C /* Exarch Desktop.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Exarch Desktop.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		A2000000000000000000000D /* PairingQRScanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PairingQRScanner.swift; sourceTree = "<group>"; };
+		A2000000000000000000000E /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		A2000000000000000000000F /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		A20000000000000000000010 /* DesktopClientModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesktopClientModel.swift; sourceTree = "<group>"; };
+		A20000000000000000000011 /* DesktopClientView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesktopClientView.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		A30000000000000000000001 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A10000000000000000000004 /* ExarchFoundation in Frameworks */,
+				A10000000000000000000005 /* ExarchUI in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A30000000000000000000002 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A10000000000000000000009 /* ExarchFoundation in Frameworks */,
+				A1000000000000000000000A /* ExarchUI in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		A40000000000000000000001 = {
+			isa = PBXGroup;
+			children = (
+				A40000000000000000000002 /* Apps */,
+				A40000000000000000000005 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		A40000000000000000000002 /* Apps */ = {
+			isa = PBXGroup;
+			children = (
+				A40000000000000000000003 /* iOS */,
+				A40000000000000000000004 /* macOS */,
+			);
+			path = Apps;
+			sourceTree = "<group>";
+		};
+		A40000000000000000000003 /* iOS */ = {
+			isa = PBXGroup;
+			children = (
+				A20000000000000000000001 /* ExarchApp.swift */,
+				A20000000000000000000002 /* MobileAppModel.swift */,
+				A20000000000000000000003 /* MobileRootView.swift */,
+				A2000000000000000000000D /* PairingQRScanner.swift */,
+				A20000000000000000000004 /* Info.plist */,
+				A20000000000000000000005 /* EXARCH.entitlements */,
+				A2000000000000000000000E /* Assets.xcassets */,
+			);
+			path = iOS;
+			sourceTree = "<group>";
+		};
+		A40000000000000000000004 /* macOS */ = {
+			isa = PBXGroup;
+			children = (
+				A20000000000000000000006 /* ExarchMacApp.swift */,
+				A20000000000000000000007 /* DesktopAppModel.swift */,
+				A20000000000000000000008 /* DesktopRootView.swift */,
+				A20000000000000000000010 /* DesktopClientModel.swift */,
+				A20000000000000000000011 /* DesktopClientView.swift */,
+				A20000000000000000000009 /* Info.plist */,
+				A2000000000000000000000A /* EXARCHMac.entitlements */,
+				A2000000000000000000000F /* Assets.xcassets */,
+			);
+			path = macOS;
+			sourceTree = "<group>";
+		};
+		A40000000000000000000005 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				A2000000000000000000000B /* EXARCH.app */,
+				A2000000000000000000000C /* Exarch Desktop.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		A50000000000000000000001 /* EXARCH */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A80000000000000000000002 /* Build configuration list for PBXNativeTarget "EXARCH" */;
+			buildPhases = (
+				A70000000000000000000001 /* Sources */,
+				A30000000000000000000001 /* Frameworks */,
+				A70000000000000000000002 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = EXARCH;
+			packageProductDependencies = (
+				A90000000000000000000001 /* ExarchFoundation */,
+				A90000000000000000000002 /* ExarchUI */,
+			);
+			productName = EXARCH;
+			productReference = A2000000000000000000000B /* EXARCH.app */;
+			productType = "com.apple.product-type.application";
+		};
+		A50000000000000000000002 /* EXARCHMac */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A80000000000000000000003 /* Build configuration list for PBXNativeTarget "EXARCHMac" */;
+			buildPhases = (
+				A70000000000000000000003 /* Sources */,
+				A30000000000000000000002 /* Frameworks */,
+				A70000000000000000000004 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = EXARCHMac;
+			packageProductDependencies = (
+				A90000000000000000000003 /* ExarchFoundation */,
+				A90000000000000000000004 /* ExarchUI */,
+			);
+			productName = "Exarch Desktop";
+			productReference = A2000000000000000000000C /* Exarch Desktop.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		A60000000000000000000001 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 2660;
+				LastUpgradeCheck = 2660;
+				TargetAttributes = {
+					A50000000000000000000001 = {
+						CreatedOnToolsVersion = 26.6;
+					};
+					A50000000000000000000002 = {
+						CreatedOnToolsVersion = 26.6;
+					};
+				};
+			};
+			buildConfigurationList = A80000000000000000000001 /* Build configuration list for PBXProject "EXARCH" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = A40000000000000000000001;
+			packageReferences = (
+				A90000000000000000000005 /* XCLocalSwiftPackageReference "." */,
+			);
+			productRefGroup = A40000000000000000000005 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				A50000000000000000000001 /* EXARCH */,
+				A50000000000000000000002 /* EXARCHMac */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		A70000000000000000000002 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A1000000000000000000000C /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A70000000000000000000004 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A1000000000000000000000D /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		A70000000000000000000001 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A10000000000000000000001 /* ExarchApp.swift in Sources */,
+				A10000000000000000000002 /* MobileAppModel.swift in Sources */,
+				A10000000000000000000003 /* MobileRootView.swift in Sources */,
+				A1000000000000000000000B /* PairingQRScanner.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A70000000000000000000003 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A10000000000000000000006 /* ExarchMacApp.swift in Sources */,
+				A10000000000000000000007 /* DesktopAppModel.swift in Sources */,
+				A10000000000000000000008 /* DesktopRootView.swift in Sources */,
+				A1000000000000000000000E /* DesktopClientModel.swift in Sources */,
+				A1000000000000000000000F /* DesktopClientView.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		B10000000000000000000001 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ENABLE_MODULES = YES;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_TESTABILITY = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				ONLY_ACTIVE_ARCH = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		B10000000000000000000002 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ENABLE_MODULES = YES;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		B10000000000000000000003 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = Apps/iOS/EXARCH.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 12;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Apps/iOS/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = co.spacegrade.exarch;
+				PRODUCT_NAME = EXARCH;
+				SDKROOT = iphoneos;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		B10000000000000000000004 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = Apps/iOS/EXARCH.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 12;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Apps/iOS/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = co.spacegrade.exarch;
+				PRODUCT_NAME = EXARCH;
+				SDKROOT = iphoneos;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		B10000000000000000000005 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = Apps/macOS/EXARCHMac.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Apps/macOS/Info.plist;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.teempai.exarch.mac;
+				PRODUCT_NAME = "Exarch Desktop";
+				SDKROOT = macosx;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 6.0;
+			};
+			name = Debug;
+		};
+		B10000000000000000000006 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = Apps/macOS/EXARCHMac.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Apps/macOS/Info.plist;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.teempai.exarch.mac;
+				PRODUCT_NAME = "Exarch Desktop";
+				SDKROOT = macosx;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 6.0;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		A80000000000000000000001 /* Build configuration list for PBXProject "EXARCH" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				B10000000000000000000001 /* Debug */,
+				B10000000000000000000002 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		A80000000000000000000002 /* Build configuration list for PBXNativeTarget "EXARCH" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				B10000000000000000000003 /* Debug */,
+				B10000000000000000000004 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		A80000000000000000000003 /* Build configuration list for PBXNativeTarget "EXARCHMac" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				B10000000000000000000005 /* Debug */,
+				B10000000000000000000006 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		A90000000000000000000005 /* XCLocalSwiftPackageReference "." */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = .;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		A90000000000000000000001 /* ExarchFoundation */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A90000000000000000000005 /* XCLocalSwiftPackageReference "." */;
+			productName = ExarchFoundation;
+		};
+		A90000000000000000000002 /* ExarchUI */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A90000000000000000000005 /* XCLocalSwiftPackageReference "." */;
+			productName = ExarchUI;
+		};
+		A90000000000000000000003 /* ExarchFoundation */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A90000000000000000000005 /* XCLocalSwiftPackageReference "." */;
+			productName = ExarchFoundation;
+		};
+		A90000000000000000000004 /* ExarchUI */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A90000000000000000000005 /* XCLocalSwiftPackageReference "." */;
+			productName = ExarchUI;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = A60000000000000000000001 /* Project object */;
+}
