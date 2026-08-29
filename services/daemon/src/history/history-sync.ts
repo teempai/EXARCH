@@ -40,6 +40,7 @@ export interface HistoryMonitoringOptions {
 const DEFAULT_DEBOUNCE_MS = 2_000;
 const DEFAULT_RECONCILIATION_INTERVAL_MS = 5 * 60_000;
 const DEFAULT_STALE_CHECK_INTERVAL_MS = 10_000;
+const DATABASE_BUSY_RETRY_DELAYS_MS = [50, 150, 500] as const;
 
 export class HistorySyncService {
   private running: Promise<HistoryImportStatus> | null = null;
@@ -184,7 +185,7 @@ export class HistorySyncService {
       for (const thread of threads) {
         status.discovered += 1;
         try {
-          const result = this.importThread(thread);
+          const result = await this.importThreadWithBusyRetry(thread);
           status.imported += 1;
           status.insertedItems += result.inserted;
           status.correctedItems += result.corrected;
@@ -228,7 +229,7 @@ export class HistorySyncService {
         for await (const thread of threads) {
           status.discovered += 1;
           try {
-            const result = this.importThread(thread);
+            const result = await this.importThreadWithBusyRetry(thread);
             status.imported += 1;
             status.insertedItems += result.inserted;
             status.correctedItems += result.corrected;
@@ -336,6 +337,18 @@ export class HistorySyncService {
       items
     });
   }
+
+  private async importThreadWithBusyRetry(thread: NativeHistoryThread) {
+    for (let attempt = 0; ; attempt += 1) {
+      try {
+        return this.importThread(thread);
+      } catch (error) {
+        const delayMs = DATABASE_BUSY_RETRY_DELAYS_MS[attempt];
+        if (delayMs === undefined || !isDatabaseBusy(error)) throw error;
+        await new Promise<void>((resolve) => setTimeout(resolve, delayMs));
+      }
+    }
+  }
 }
 
 function aggregateState(providers: ProviderImportStatus[]): HistoryImportStatus["state"] {
@@ -368,4 +381,12 @@ function digest(value: unknown): string {
 
 function errorMessage(error: unknown): string {
   return (error instanceof Error ? error.message : String(error)).slice(0, 2_000);
+}
+
+function isDatabaseBusy(error: unknown): boolean {
+  const code = error !== null && typeof error === "object" && "code" in error
+    ? String(error.code)
+    : "";
+  const message = errorMessage(error).toLowerCase();
+  return code === "SQLITE_BUSY" || message.includes("database is locked");
 }

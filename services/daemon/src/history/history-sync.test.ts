@@ -1,7 +1,7 @@
 import { mkdtempSync, realpathSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { CanonicalStore } from "../../../../packages/core/src/index.js";
 import type { HistoryReader, NativeHistoryThread } from "./types.js";
 import { HistorySyncService } from "./history-sync.js";
@@ -166,6 +166,27 @@ describe("HistorySyncService", () => {
 
     release?.();
     await expect(completion).resolves.toMatchObject({ state: "complete" });
+  });
+
+  it("retries a transient SQLite busy failure without making the scan partial", async () => {
+    const store = new CanonicalStore(":memory:");
+    stores.push(store);
+    const originalImport = store.importHistoryThread.bind(store);
+    const importSpy = vi.spyOn(store, "importHistoryThread")
+      .mockImplementationOnce(() => {
+        throw Object.assign(new Error("database is locked"), { code: "SQLITE_BUSY" });
+      })
+      .mockImplementation((input) => originalImport(input));
+    const sync = new HistorySyncService(store, [{
+      provider: "codex",
+      readHistory: async () => [fixtureThread()]
+    }]);
+
+    await expect(sync.syncAll()).resolves.toMatchObject({
+      state: "complete",
+      providers: [{ provider: "codex", state: "complete", imported: 1, failedThreads: 0 }]
+    });
+    expect(importSpy).toHaveBeenCalledTimes(2);
   });
 
   it("debounces native file changes and imports only the changed thread", async () => {
