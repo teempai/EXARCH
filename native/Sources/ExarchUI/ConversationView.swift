@@ -1,5 +1,10 @@
 import ExarchFoundation
 import SwiftUI
+#if canImport(AppKit)
+import AppKit
+#elseif canImport(UIKit)
+import UIKit
+#endif
 
 public struct FocusFlowConversationView: View {
     @Binding private var provider: Provider
@@ -45,6 +50,8 @@ public struct FocusFlowConversationView: View {
     private let setFallbackRoute: ([Provider]) -> Void
     @State private var showingSettings = false
     @State private var pendingProvider: Provider?
+    @State private var followingLatest = true
+    private let latestMessageAnchor = "exarch:latest-message"
 
     public init(
         title: String,
@@ -136,6 +143,11 @@ public struct FocusFlowConversationView: View {
                             }
                                 .id(message.id)
                         }
+                        Color.clear
+                            .frame(height: 1)
+                            .id(latestMessageAnchor)
+                            .onAppear { followingLatest = true }
+                            .onDisappear { followingLatest = false }
                     }
                     .padding(.horizontal, 18)
                     .padding(.vertical, 22)
@@ -146,8 +158,14 @@ public struct FocusFlowConversationView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 .defaultScrollAnchor(.bottom)
-                .onChange(of: messages.last?.id) {
-                    if let last = messages.last { withAnimation { proxy.scrollTo(last.id, anchor: .bottom) } }
+                .onChange(of: messages.map(\.id)) {
+                    // Preserve the user's reading position when they have
+                    // scrolled up. If they are following the latest message —
+                    // or just sent one locally — keep the stable bottom anchor
+                    // visible without an animation that makes the transcript
+                    // appear to bounce during reconciliation.
+                    guard followingLatest || messages.last?.id.hasPrefix("pending:") == true else { return }
+                    proxy.scrollTo(latestMessageAnchor, anchor: .bottom)
                 }
             }
             composer
@@ -499,41 +517,59 @@ public struct FocusFlowConversationView: View {
 
     @ViewBuilder
     private func messageRow(_ message: ChatMessage, attributed: Bool) -> some View {
-        if message.role == .status {
-            // `raised` rather than `accentSoft`. accentSoft is the accent at
-            // rest — user bubbles and selected chips — so a line the system
-            // emitted was drawn in the same fill as a line the user wrote, and
-            // brass was carrying a status (STYLE_GUIDE.md §3.2). raised is the
-            // neutral step from surface and reads as chrome, which this is.
-            Text(message.text)
-                .font(.caption)
-                .foregroundStyle(FocusFlowTheme.secondaryInk)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 7)
-                .background(FocusFlowTheme.raised, in: Capsule())
-        } else {
-            HStack {
-                if message.role == .user { Spacer(minLength: 42) }
-                VStack(alignment: .leading, spacing: 7) {
-                    if message.role == .assistant, attributed, let provider = message.provider {
-                        Text(provider.displayName.uppercased())
-                            .font(.caption2.weight(.bold))
-                            .tracking(0.7)
-                            .foregroundStyle(FocusFlowTheme.accent)
+        Group {
+            if message.role == .status {
+                // `raised` rather than `accentSoft`. accentSoft is the accent at
+                // rest — user bubbles and selected chips — so a line the system
+                // emitted was drawn in the same fill as a line the user wrote, and
+                // brass was carrying a status (STYLE_GUIDE.md §3.2). raised is the
+                // neutral step from surface and reads as chrome, which this is.
+                Text(message.text)
+                    .font(.caption)
+                    .foregroundStyle(FocusFlowTheme.secondaryInk)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 7)
+                    .background(FocusFlowTheme.raised, in: Capsule())
+            } else {
+                HStack {
+                    if message.role == .user { Spacer(minLength: 42) }
+                    VStack(alignment: .leading, spacing: 7) {
+                        if message.role == .assistant, attributed, let provider = message.provider {
+                            Text(provider.displayName.uppercased())
+                                .font(.caption2.weight(.bold))
+                                .tracking(0.7)
+                                .foregroundStyle(FocusFlowTheme.accent)
+                        }
+                        MarkdownMessageView(message.text, fontSize: messageFontSize)
                     }
-                    MarkdownMessageView(message.text, fontSize: messageFontSize)
+                    .padding(.horizontal, message.role == .user ? 15 : 0)
+                    .padding(.vertical, message.role == .user ? 11 : 0)
+                    .background(message.role == .user ? FocusFlowTheme.accentSoft : .clear, in: RoundedRectangle(cornerRadius: 18))
+                    if message.role == .assistant { Spacer(minLength: 24) }
                 }
-                .padding(.horizontal, message.role == .user ? 15 : 0)
-                .padding(.vertical, message.role == .user ? 11 : 0)
-                .background(message.role == .user ? FocusFlowTheme.accentSoft : .clear, in: RoundedRectangle(cornerRadius: 18))
-                if message.role == .assistant { Spacer(minLength: 24) }
+                // The label is now drawn only on a change, so VoiceOver names the
+                // harness on every reply rather than inheriting whatever the last
+                // visible label happened to be.
+                .accessibilityElement(children: .contain)
+                .accessibilityLabel(spokenLabel(message))
             }
-            // The label is now drawn only on a change, so VoiceOver names the
-            // harness on every reply rather than inheriting whatever the last
-            // visible label happened to be.
-            .accessibilityElement(children: .combine)
-            .accessibilityLabel(spokenLabel(message))
         }
+        .contextMenu {
+            Button {
+                copyMessage(message.text)
+            } label: {
+                Label("Copy message", systemImage: "doc.on.doc")
+            }
+        }
+    }
+
+    private func copyMessage(_ text: String) {
+#if canImport(UIKit)
+        UIPasteboard.general.string = text
+#elseif canImport(AppKit)
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(text, forType: .string)
+#endif
     }
 
     private func spokenLabel(_ message: ChatMessage) -> String {

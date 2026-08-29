@@ -209,7 +209,7 @@ export class ConversationCoordinator {
     }
     this.activeTurns.set(conversationId, { turnId, abort });
     const providerContextEvents = selectProviderContextEvents(
-      this.store.listRecentEvents(conversationId, { limit: 100 }),
+      this.store.listRecentEvents(conversationId, { limit: 100, activeImportsOnly: true }),
       binding?.synchronizedThroughSequence ?? 0
     );
     let workspaceReleased = false;

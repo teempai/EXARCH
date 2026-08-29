@@ -156,7 +156,10 @@ export class ContextService {
     switch (request.operation) {
       case "current": {
         const conversation = this.store.getConversation(request.conversationId);
-        const events = this.store.listRecentEvents(request.conversationId, { limit: 50 });
+        const events = this.store.listRecentEvents(request.conversationId, {
+          limit: 50,
+          activeImportsOnly: true
+        });
         return {
           conversation,
           sourceRange: {
@@ -170,7 +173,8 @@ export class ContextService {
         const before = optionalPositiveInteger(request.arguments.before);
         return this.store.listRecentEvents(request.conversationId, {
           ...(before === undefined ? {} : { before }),
-          limit: optionalPositiveInteger(request.arguments.limit) ?? 50
+          limit: optionalPositiveInteger(request.arguments.limit) ?? 50,
+          activeImportsOnly: true
         });
       }
       case "search": {
@@ -194,7 +198,11 @@ export class ContextService {
           throw new Error("Event range must be ordered and contain at most 500 events");
         }
         return this.store
-          .listEvents(request.conversationId, { after: from - 1, limit: to - from + 1 })
+          .listEvents(request.conversationId, {
+            after: from - 1,
+            limit: to - from + 1,
+            activeImportsOnly: true
+          })
           .filter((event) => event.sequence <= to);
       }
       case "decisions.list":
@@ -241,7 +249,8 @@ export class ContextService {
         return this.store.latestEventByType(request.conversationId, "repository.checkpointed");
       case "handoffs":
         return this.store.listRecentEvents(request.conversationId, {
-          limit: optionalPositiveInteger(request.arguments.limit) ?? 20
+          limit: optionalPositiveInteger(request.arguments.limit) ?? 20,
+          activeImportsOnly: true
         }).filter((event) => event.type.startsWith("provider.handoff."));
     }
   }

@@ -59,6 +59,111 @@ describe("HistorySyncService", () => {
     expect(store.verifyEventChain(source!.conversationId).valid).toBe(true);
   });
 
+  it("reconciles provider history with the live EXARCH turn instead of duplicating messages", async () => {
+    const store = new CanonicalStore(":memory:");
+    stores.push(store);
+    const thread = fixtureThread();
+    const sync = new HistorySyncService(store, [{
+      provider: "codex",
+      readHistory: async () => [thread]
+    }]);
+    await sync.syncAll();
+    const source = store.listHistorySources("codex")[0]!;
+    const user = store.appendEvent({
+      conversationId: source.conversationId,
+      turnId: "turn_live",
+      type: "user.message",
+      provider: "codex",
+      payload: { text: "Run once", clientMessageId: "message_live" },
+      occurredAt: "2026-08-20T10:02:00.000Z"
+    });
+    const assistant = store.appendEvent({
+      conversationId: source.conversationId,
+      turnId: "turn_live",
+      type: "assistant.message.completed",
+      provider: "codex",
+      payload: { text: "One response" },
+      occurredAt: "2026-08-20T10:02:02.000Z"
+    });
+    thread.updatedAt = "2026-08-20T10:02:02.100Z";
+    thread.items.push(
+      {
+        nativeItemId: "user-live",
+        type: "user.message",
+        payload: { text: "Run once" },
+        occurredAt: "2026-08-20T10:02:00.050Z"
+      },
+      {
+        nativeItemId: "assistant-live",
+        type: "assistant.message.completed",
+        payload: { text: "One response" },
+        occurredAt: "2026-08-20T10:02:02.100Z"
+      }
+    );
+
+    const result = await sync.syncAll();
+
+    expect(result.providers[0]).toMatchObject({ insertedItems: 0, unchangedItems: 5 });
+    const display = store.listEvents(source.conversationId, { displayOnly: true, limit: 100 });
+    expect(display.filter((event) => event.payload.text === "Run once")).toEqual([user]);
+    expect(display.filter((event) => event.payload.text === "One response")).toEqual([assistant]);
+    const mappings = store.database.prepare(
+      `SELECT native_item_id, canonical_event_id FROM imported_items
+        WHERE history_source_id = ? AND native_item_id IN ('user-live', 'assistant-live')
+        ORDER BY native_item_id`
+    ).all(source.id) as Array<{ native_item_id: string; canonical_event_id: string }>;
+    expect(mappings).toEqual([
+      { native_item_id: "assistant-live", canonical_event_id: assistant.id },
+      { native_item_id: "user-live", canonical_event_id: user.id }
+    ]);
+
+    // Also cover the inverse race: the file watcher imports the provider's
+    // native record just before the live coordinator commits its counterpart.
+    thread.updatedAt = "2026-08-20T10:03:02.100Z";
+    thread.items.push(
+      {
+        nativeItemId: "user-race",
+        type: "user.message",
+        payload: { text: "Raced once" },
+        occurredAt: "2026-08-20T10:03:00.050Z"
+      },
+      {
+        nativeItemId: "assistant-race",
+        type: "assistant.message.completed",
+        payload: { text: "Race response" },
+        occurredAt: "2026-08-20T10:03:02.100Z"
+      }
+    );
+    await sync.syncAll();
+    const racedUser = store.appendEvent({
+      conversationId: source.conversationId,
+      turnId: "turn_race",
+      type: "user.message",
+      provider: "codex",
+      payload: { text: "Raced once", clientMessageId: "message_race" },
+      occurredAt: "2026-08-20T10:03:00.000Z"
+    });
+    const racedAssistant = store.appendEvent({
+      conversationId: source.conversationId,
+      turnId: "turn_race",
+      type: "assistant.message.completed",
+      provider: "codex",
+      payload: { text: "Race response" },
+      occurredAt: "2026-08-20T10:03:02.000Z"
+    });
+    await sync.syncAll();
+
+    const repairedDisplay = store.listEvents(source.conversationId, { displayOnly: true, limit: 100 });
+    expect(repairedDisplay.filter((event) => event.payload.text === "Raced once")).toEqual([racedUser]);
+    expect(repairedDisplay.filter((event) => event.payload.text === "Race response")).toEqual([racedAssistant]);
+    expect(store.searchEvents(
+      store.getConversation(source.conversationId).projectId,
+      source.conversationId,
+      "Race response"
+    ))
+      .toHaveLength(1);
+  });
+
   it("redacts imported titles before hashing, persistence, events, and search indexing", async () => {
     const store = new CanonicalStore(":memory:");
     stores.push(store);

@@ -75,10 +75,24 @@ public enum ConversationProjection {
     }
 
     public static func messages(from events: [CanonicalEvent]) -> [ChatMessage] {
-        events.compactMap { event in
+        let liveMessages = events.filter { event in
+            event.turnId != nil
+                && event.payload["imported"] != .bool(true)
+                && ["user.message", "assistant.message.completed"].contains(event.type)
+                && event.visibleText != nil
+        }
+        return events.compactMap { event -> ChatMessage? in
+            // Native provider history mirrors turns that EXARCH has already
+            // recorded. The daemon reconciles those copies in its import
+            // ledger; this projection guard also keeps an older cached mirror
+            // from rendering twice while a device refreshes that ledger.
+            if event.payload["imported"] == .bool(true),
+               liveMessages.contains(where: { mirrors(event, $0) }) {
+                return nil
+            }
             switch event.type {
             case "user.message":
-                event.visibleText.map {
+                return event.visibleText.map {
                     ChatMessage(
                         id: event.id,
                         role: .user,
@@ -89,20 +103,35 @@ public enum ConversationProjection {
                     )
                 }
             case "assistant.message.completed":
-                event.visibleText.map {
+                return event.visibleText.map {
                     ChatMessage(id: event.id, role: .assistant, text: $0, provider: event.provider, sequence: event.sequence)
                 }
             case "provider.handoff.completed":
-                ChatMessage(
+                return ChatMessage(
                     id: event.id,
                     role: .status,
                     text: "Context handed to \(event.provider?.displayName ?? "the selected harness")",
                     provider: event.provider,
                     sequence: event.sequence
                 )
-            default: nil
+            default: return nil
             }
         }
+    }
+
+    private static func mirrors(_ imported: CanonicalEvent, _ live: CanonicalEvent) -> Bool {
+        guard imported.type == live.type,
+              imported.provider == live.provider,
+              imported.visibleText == live.visibleText,
+              let importedAt = eventDate(imported.occurredAt),
+              let liveAt = eventDate(live.occurredAt) else { return false }
+        return abs(importedAt.timeIntervalSince(liveAt)) <= 60
+    }
+
+    private static func eventDate(_ value: String) -> Date? {
+        let precise = ISO8601DateFormatter()
+        precise.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return precise.date(from: value) ?? ISO8601DateFormatter().date(from: value)
     }
 
     private static func clientMessageID(from event: CanonicalEvent) -> String? {

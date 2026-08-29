@@ -283,7 +283,7 @@ final class DesktopClientModel: ObservableObject {
             )
             awaitingInitialHistoryImport = conversations.isEmpty
             identityRepairRequired = false
-            try await refreshAllAuthoritatively(prefetchMessages: false)
+            try await refreshStartupAuthoritatively()
             startupGate.recordAuthoritativeRefresh()
             phase = .ready
             startPolling()
@@ -291,6 +291,25 @@ final class DesktopClientModel: ObservableObject {
         } catch {
             phase = .failed(describe(error))
         }
+    }
+
+    /// launchd may report the daemon online a fraction before its signed API
+    /// is ready to serve the first complete refresh. Keep the honest
+    /// connecting state during that bounded grace period instead of flashing
+    /// a Reconnect screen for a connection that is already succeeding.
+    private func refreshStartupAuthoritatively() async throws {
+        var lastError: Error?
+        for attempt in 0..<4 {
+            do {
+                try await refreshAllAuthoritatively(prefetchMessages: false)
+                return
+            } catch {
+                lastError = error
+                guard attempt < 3 else { break }
+                try await Task.sleep(for: .milliseconds(400 * (attempt + 1)))
+            }
+        }
+        throw lastError ?? ExarchError.unavailable("The local service did not complete startup")
     }
 
     func retry() {
@@ -611,10 +630,8 @@ final class DesktopClientModel: ObservableObject {
         let knownEvents = Set(events.map(\.id))
         events += incoming.filter { !knownEvents.contains($0.id) }
         events.sort { $0.sequence < $1.sequence }
-        let knownMessages = Set(messages.map(\.id))
-        messages += ConversationProjection.messages(from: incoming)
-            .filter { !knownMessages.contains($0.id) }
-        messages.sort { $0.sequence < $1.sequence }
+        messages = ConversationProjection.messages(from: events)
+            .sorted { $0.sequence < $1.sequence }
     }
 
     private func mergeIntoCache(_ incoming: [CanonicalEvent]) {
