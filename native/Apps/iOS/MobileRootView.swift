@@ -195,37 +195,59 @@ struct MobileRootView: View {
     }
 
     private var conversation: some View {
-        FocusFlowConversationView(
-            title: model.activeConversation?.title ?? "Conversation",
-            provider: Binding(get: { model.provider }, set: { model.selectProvider($0) }),
-            modelName: $model.modelName,
-            policyLabel: model.policyLabel,
-            policyDetails: model.policyDetails,
-            capacity: model.currentCapacity,
-            models: model.availableModels,
-            messages: model.displayedMessages,
-            historyError: model.conversationLoadError,
-            isLoadingMessages: model.isLoadingMessages,
-            isLoadingOlderMessages: model.isLoadingOlderMessages,
-            canLoadOlderMessages: model.canLoadOlderMessages,
-            availableProviders: model.availableProviders,
-            fallbackRoute: model.activeConversation?.fallbackRoute ?? [model.provider],
-            voiceStatus: voice.statusText,
-            voiceTranscript: voice.partialTranscript,
-            voiceEnabled: $model.voiceEnabled,
-            draft: $model.draft,
-            busy: model.busy,
-            interrupting: model.interrupting,
-            turnStatus: model.turnStatus,
-            back: { showConversation = false },
-            send: model.send,
-            interrupt: model.interrupt,
-            toggleVoice: model.setVoice,
-            stopVoice: model.stopVoice,
-            loadOlderMessages: model.loadOlderMessages,
-            retryMessages: model.retryConversationMessages,
-            setFallbackRoute: model.setFallbackRoute
-        )
+        VStack(spacing: 0) {
+            if let project = model.activeBrowseOnlyProject {
+                HStack(spacing: 8) {
+                    Image(systemName: "folder.badge.questionmark")
+                        .foregroundStyle(FocusFlowTheme.attention)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Browse-only project")
+                            .font(.caption.weight(.semibold))
+                        Text("Enroll \(project.repoRoot) from EXARCH Desktop to send messages.")
+                            .font(.caption2)
+                            .foregroundStyle(FocusFlowTheme.secondaryInk)
+                            .lineLimit(2)
+                            .truncationMode(.middle)
+                    }
+                    Spacer(minLength: 0)
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 9)
+                .background(FocusFlowTheme.surface)
+                .overlay(alignment: .bottom) { Divider() }
+            }
+            FocusFlowConversationView(
+                title: model.activeConversation?.title ?? "Conversation",
+                provider: Binding(get: { model.provider }, set: { model.selectProvider($0) }),
+                modelName: $model.modelName,
+                policyLabel: model.policyLabel,
+                policyDetails: model.policyDetails,
+                capacity: model.currentCapacity,
+                models: model.availableModels,
+                messages: model.displayedMessages,
+                historyError: model.conversationLoadError,
+                isLoadingMessages: model.isLoadingMessages,
+                isLoadingOlderMessages: model.isLoadingOlderMessages,
+                canLoadOlderMessages: model.canLoadOlderMessages,
+                availableProviders: model.availableProviders,
+                fallbackRoute: model.activeConversation?.fallbackRoute ?? [model.provider],
+                voiceStatus: voice.statusText,
+                voiceTranscript: voice.partialTranscript,
+                voiceEnabled: $model.voiceEnabled,
+                draft: $model.draft,
+                busy: model.busy,
+                interrupting: model.interrupting,
+                turnStatus: model.turnStatus,
+                back: { showConversation = false },
+                send: model.send,
+                interrupt: model.interrupt,
+                toggleVoice: model.setVoice,
+                stopVoice: model.stopVoice,
+                loadOlderMessages: model.loadOlderMessages,
+                retryMessages: model.retryConversationMessages,
+                setFallbackRoute: model.setFallbackRoute
+            )
+        }
     }
 
     private func capacityActionLabel(_ provider: Provider) -> String {

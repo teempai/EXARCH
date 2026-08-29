@@ -56,4 +56,33 @@ struct LoopbackTransportTests {
         #expect(LocalDeviceEnrollment.rawKey("p256:AAAA") == "AAAA")
         #expect(LocalDeviceEnrollment.rawKey("AAAA") == "AAAA")
     }
+
+    @Test("project enrollment must confirm the imported identity and exact path")
+    func exactProjectEnrollment() {
+        let project = Project(
+            id: "project_1",
+            name: "Example",
+            repoRoot: "/Users/example/Project",
+            allowedPaths: [],
+            createdAt: "2026-08-29T00:00:00.000Z"
+        )
+        #expect(LocalDeviceEnrollment.confirmsExactProjectEnrollment(
+            expected: project,
+            id: "project_1",
+            repoRoot: "/Users/example/Project",
+            allowedPaths: ["/Users/example/Project"]
+        ))
+        #expect(!LocalDeviceEnrollment.confirmsExactProjectEnrollment(
+            expected: project,
+            id: "project_1",
+            repoRoot: "/Users/example",
+            allowedPaths: ["/Users/example"]
+        ))
+        #expect(!LocalDeviceEnrollment.confirmsExactProjectEnrollment(
+            expected: project,
+            id: "project_2",
+            repoRoot: "/Users/example/Project",
+            allowedPaths: ["/Users/example/Project"]
+        ))
+    }
 }
