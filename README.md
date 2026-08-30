@@ -15,6 +15,8 @@ frames and cannot read conversation content or authorize laptop actions.
 > Developer ID signed or notarized. Read
 > [the security boundary](SECURITY.md) before using it with important data.
 
+Note: Harnesses push updates often. This repo is not maintained at the same speed, but feel free to fork.
+
 ## What you need
 
 - A Mac running macOS 14 or newer
