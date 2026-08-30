@@ -76,6 +76,7 @@ final class MobileAppModel: ObservableObject {
     @Published var isSyncing = false
     @Published var lastSyncError: String?
     @Published var conversationLoadError: String?
+    @Published private(set) var isPreparingConversation = false
     @Published var isLoadingMessages = false
     @Published var isLoadingOlderMessages = false
     @Published private(set) var isLoadingMoreThreads = false
@@ -478,6 +479,7 @@ final class MobileAppModel: ObservableObject {
     func selectConversation(_ selected: Conversation) {
         guard selected.id != activeConversation?.id, !busy else { return }
         voice.cancel()
+        isPreparingConversation = true
         activeConversation = selected
         provider = selected.activeProvider ?? .codex
         modelName = ""
@@ -494,16 +496,15 @@ final class MobileAppModel: ObservableObject {
         updatePolicyLabel()
         persistIndex()
         Task {
-            await hydrateEventsFromCache(selected.id)
+            let hasCachedMessages = await hydrateEventsFromCache(selected.id)
             guard activeConversation?.id == selected.id else {
-                isLoadingMessages = false
                 return
             }
-            do {
-                try await refreshPolicy(provider, conversationID: selected.id)
-            } catch {
-                lastSyncError = String(describing: error)
-            }
+            // A cached window is enough to reveal a stable, immediately useful
+            // transcript. If this thread has not been cached yet, keep the
+            // opening placeholder in place until the first authoritative page
+            // arrives rather than showing an empty view and then moving it.
+            if hasCachedMessages { isPreparingConversation = false }
             do {
                 try await refreshRecentMessages(selected.id)
                 conversationLoadError = nil
@@ -511,7 +512,18 @@ final class MobileAppModel: ObservableObject {
                 conversationLoadError = "Messages couldn’t sync. Check the Mac connection and tap to retry."
                 lastSyncError = String(describing: error)
             }
-            if activeConversation?.id == selected.id { isLoadingMessages = false }
+            // Message hydration owns the opening experience. Policy metadata
+            // may arrive afterward without keeping an uncached conversation
+            // behind a blank loading surface.
+            if activeConversation?.id == selected.id { isPreparingConversation = false }
+            do {
+                try await refreshPolicy(provider, conversationID: selected.id)
+            } catch {
+                lastSyncError = String(describing: error)
+            }
+            if activeConversation?.id == selected.id {
+                isLoadingMessages = false
+            }
         }
     }
 
@@ -790,6 +802,7 @@ final class MobileAppModel: ObservableObject {
         events = []
         cachedConversationEvents = []
         conversationLoadError = nil
+        isPreparingConversation = false
         canLoadOlderMessages = false
         snapshots = []
         pinnedConversationIDs = []
@@ -1008,7 +1021,7 @@ final class MobileAppModel: ObservableObject {
                 ?? conversations.first
             if let conversation = activeConversation {
                 provider = conversation.activeProvider ?? .codex
-                await hydrateEventsFromCache(conversation.id)
+                _ = await hydrateEventsFromCache(conversation.id)
             }
             updatePolicyLabel()
         } catch {
@@ -1016,26 +1029,29 @@ final class MobileAppModel: ObservableObject {
         }
     }
 
-    private func hydrateEventsFromCache(_ conversationID: String) async {
-        guard let deviceID = pairedDeviceID else { return }
+    @discardableResult
+    private func hydrateEventsFromCache(_ conversationID: String) async -> Bool {
+        guard let deviceID = pairedDeviceID else { return false }
         let cacheStore = cacheStore
         do {
             let cached = try await Task.detached(operation: {
                 try cacheStore.loadEvents(deviceID: deviceID, conversationID: conversationID)
             }).value
-            guard activeConversation?.id == conversationID else { return }
+            guard activeConversation?.id == conversationID else { return false }
             cachedConversationEvents = cached.sorted { $0.sequence < $1.sequence }
             let displayEvents = cachedConversationEvents.filter(Self.isDisplayEvent)
             events = Array(displayEvents.suffix(Self.initialMessageCount))
             messages = ConversationProjection.messages(from: events).sorted { $0.sequence < $1.sequence }
             canLoadOlderMessages = displayEvents.count > events.count || events.count == Self.initialMessageCount
+            return !messages.isEmpty
         } catch {
-            guard activeConversation?.id == conversationID else { return }
+            guard activeConversation?.id == conversationID else { return false }
             cachedConversationEvents = []
             events = []
             messages = []
             canLoadOlderMessages = false
             lastSyncError = "This thread’s saved messages could not be opened."
+            return false
         }
     }
 

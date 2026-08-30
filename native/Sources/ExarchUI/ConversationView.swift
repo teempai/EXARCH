@@ -6,6 +6,15 @@ import AppKit
 import UIKit
 #endif
 
+func shouldFollowLatestMessage(
+    isLoadingMessages: Bool,
+    followingLatest: Bool,
+    latestMessageID: String?
+) -> Bool {
+    guard !isLoadingMessages else { return false }
+    return followingLatest || latestMessageID?.hasPrefix("pending:") == true
+}
+
 public struct FocusFlowConversationView: View {
     @Binding private var provider: Provider
     @Binding private var modelName: String
@@ -18,6 +27,7 @@ public struct FocusFlowConversationView: View {
     private let models: [ProviderModel]
     private let messages: [ChatMessage]
     private let historyError: String?
+    private let isPreparingMessages: Bool
     private let isLoadingMessages: Bool
     private let isLoadingOlderMessages: Bool
     private let canLoadOlderMessages: Bool
@@ -63,6 +73,7 @@ public struct FocusFlowConversationView: View {
         models: [ProviderModel],
         messages: [ChatMessage],
         historyError: String?,
+        isPreparingMessages: Bool = false,
         isLoadingMessages: Bool,
         isLoadingOlderMessages: Bool,
         canLoadOlderMessages: Bool,
@@ -97,6 +108,7 @@ public struct FocusFlowConversationView: View {
         self.models = models
         self.messages = messages
         self.historyError = historyError
+        self.isPreparingMessages = isPreparingMessages
         self.isLoadingMessages = isLoadingMessages
         self.isLoadingOlderMessages = isLoadingOlderMessages
         self.canLoadOlderMessages = canLoadOlderMessages
@@ -124,50 +136,8 @@ public struct FocusFlowConversationView: View {
     }
 
     public var body: some View {
-        // Capture this once for the render pass. Looking it up through a
-        // computed property inside every ForEach row would rescan the full
-        // transcript for every message as lazy-loaded history grows.
-        let attributedMessageIDs = harnessAttributionPoints(in: messages)
         return VStack(spacing: 0) {
-            ScrollViewReader { proxy in
-                ScrollView {
-                    LazyVStack(spacing: 18) {
-                        historyBoundary
-                        ForEach(messages) { message in
-                            VStack(spacing: 8) {
-                                messageRow(message, attributed: attributedMessageIDs.contains(message.id))
-                                if message.role == .user,
-                                   message.clientMessageID == turnStatus?.clientMessageID {
-                                    turnStatusRow
-                                }
-                            }
-                                .id(message.id)
-                        }
-                        Color.clear
-                            .frame(height: 1)
-                            .id(latestMessageAnchor)
-                            .onAppear { followingLatest = true }
-                            .onDisappear { followingLatest = false }
-                    }
-                    .padding(.horizontal, 18)
-                    .padding(.vertical, 22)
-                    // Left-anchored rather than centred, so the column stays
-                    // put against the sidebar while the window is resized
-                    // instead of drifting away from it.
-                    .frame(maxWidth: transcriptMaxWidth ?? .infinity, alignment: .leading)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                }
-                .defaultScrollAnchor(.bottom)
-                .onChange(of: messages.map(\.id)) {
-                    // Preserve the user's reading position when they have
-                    // scrolled up. If they are following the latest message —
-                    // or just sent one locally — keep the stable bottom anchor
-                    // visible without an animation that makes the transcript
-                    // appear to bounce during reconciliation.
-                    guard followingLatest || messages.last?.id.hasPrefix("pending:") == true else { return }
-                    proxy.scrollTo(latestMessageAnchor, anchor: .bottom)
-                }
-            }
+            transcriptRegion
             composer
         }
         .background(FocusFlowTheme.canvas.ignoresSafeArea())
@@ -349,6 +319,70 @@ public struct FocusFlowConversationView: View {
             }
         } message: { candidate in
             Text("This moves the conversation context from \(provider.displayName) to \(candidate.displayName). The laptop will record the handoff before the new harness continues.")
+        }
+    }
+
+    @ViewBuilder
+    private var transcriptRegion: some View {
+        if isPreparingMessages {
+            VStack(spacing: 10) {
+                ProgressView()
+                Text("Opening conversation…")
+                    .font(.footnote)
+                    .foregroundStyle(FocusFlowTheme.secondaryInk)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else {
+            // Capture this once for the render pass. Looking it up through a
+            // computed property inside every ForEach row would rescan the full
+            // transcript for every message as lazy-loaded history grows.
+            let attributedMessageIDs = harnessAttributionPoints(in: messages)
+            ScrollViewReader { proxy in
+                ScrollView {
+                    LazyVStack(spacing: 18) {
+                        historyBoundary
+                        ForEach(messages) { message in
+                            VStack(spacing: 8) {
+                                messageRow(message, attributed: attributedMessageIDs.contains(message.id))
+                                if message.role == .user,
+                                   message.clientMessageID == turnStatus?.clientMessageID {
+                                    turnStatusRow
+                                }
+                            }
+                            .id(message.id)
+                        }
+                        Color.clear
+                            .frame(height: 1)
+                            .id(latestMessageAnchor)
+                            .onAppear { followingLatest = true }
+                            .onDisappear { followingLatest = false }
+                    }
+                    .padding(.horizontal, 18)
+                    .padding(.vertical, 22)
+                    // Left-anchored rather than centred, so the column stays
+                    // put against the sidebar while the window is resized
+                    // instead of drifting away from it.
+                    .frame(maxWidth: transcriptMaxWidth ?? .infinity, alignment: .leading)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .defaultScrollAnchor(.bottom)
+                .onChange(of: messages.map(\.id)) {
+                    // Initial cache hydration and authoritative reconciliation
+                    // both replace the visible window. The default bottom
+                    // anchor already owns that layout, so an imperative scroll
+                    // during loading only makes the transcript visibly bounce.
+                    // Preserve the user's reading position when they have
+                    // scrolled up. If they are following the latest message —
+                    // or just sent one locally — keep the stable bottom anchor
+                    // visible without an animation.
+                    guard shouldFollowLatestMessage(
+                        isLoadingMessages: isLoadingMessages,
+                        followingLatest: followingLatest,
+                        latestMessageID: messages.last?.id
+                    ) else { return }
+                    proxy.scrollTo(latestMessageAnchor, anchor: .bottom)
+                }
+            }
         }
     }
 
