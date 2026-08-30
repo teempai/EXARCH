@@ -139,8 +139,7 @@ final class MobileAppModel: ObservableObject {
     }
 
     var displayedMessages: [ChatMessage] {
-        guard let pendingOutgoingMessage else { return messages }
-        return messages + [pendingOutgoingMessage]
+        ConversationProjection.displayedMessages(messages, pending: pendingOutgoingMessage)
     }
 
     var capacityAlternatives: [Provider] {

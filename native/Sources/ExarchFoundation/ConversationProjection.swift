@@ -46,6 +46,18 @@ public struct ConversationTurnStatus: Equatable, Sendable {
 }
 
 public enum ConversationProjection {
+    public static func displayedMessages(
+        _ messages: [ChatMessage],
+        pending pendingMessage: ChatMessage?
+    ) -> [ChatMessage] {
+        guard let pendingMessage else { return messages }
+        if let clientMessageID = pendingMessage.clientMessageID,
+           messages.contains(where: { $0.clientMessageID == clientMessageID }) {
+            return messages
+        }
+        return messages + [pendingMessage]
+    }
+
     public static func pendingUserMessage(
         clientMessageID: String,
         text: String,
