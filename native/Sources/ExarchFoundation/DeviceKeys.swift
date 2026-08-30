@@ -36,6 +36,19 @@ public actor DeviceKeyManager {
                 return signer
             }
 #endif
+#if os(macOS) && !targetEnvironment(simulator)
+            // Marker 1 approval keys were created with
+            // `biometryCurrentSet`, which makes Touch ID the only way to use
+            // them. Rotate locally to a Secure Enclave `userPresence` key so
+            // macOS can offer the account password fallback. The desktop
+            // client repairs the daemon's public approval key only after the
+            // new key has successfully authenticated and signed a decision.
+            if purpose == .approval, stored.first == 1 {
+                let signer = try create(purpose: purpose)
+                try store.write(try representation(of: signer), account: account)
+                return signer
+            }
+#endif
             return try decode(stored, purpose: purpose)
         }
         let signer = try create(purpose: purpose)
@@ -59,7 +72,13 @@ public actor DeviceKeyManager {
 #endif
         if SecureEnclave.isAvailable {
             var flags: SecAccessControlCreateFlags = [.privateKeyUsage]
-            if purpose == .approval { flags.insert(.biometryCurrentSet) }
+            if purpose == .approval {
+#if os(macOS)
+                flags.insert(.userPresence)
+#else
+                flags.insert(.biometryCurrentSet)
+#endif
+            }
             var error: Unmanaged<CFError>?
             guard let access = SecAccessControlCreateWithFlags(
                 nil,
@@ -87,6 +106,11 @@ public actor DeviceKeyManager {
                 dataRepresentation: Data(keyData),
                 requiresPresence: purpose == .approval
             )
+        case 3:
+            return SecureEnclaveSigner(
+                dataRepresentation: Data(keyData),
+                requiresPresence: purpose == .approval
+            )
         case 2:
             return SoftwareP256Signer(
                 key: try P256.Signing.PrivateKey(rawRepresentation: keyData),
@@ -106,7 +130,13 @@ public actor DeviceKeyManager {
     }
 
     private func representation(of signer: any P256PayloadSigner) throws -> Data {
-        if let secure = signer as? SecureEnclaveSigner { return Data([1]) + secure.dataRepresentation }
+        if let secure = signer as? SecureEnclaveSigner {
+#if os(macOS)
+            return Data([3]) + secure.dataRepresentation
+#else
+            return Data([1]) + secure.dataRepresentation
+#endif
+        }
         if let software = signer as? SoftwareP256Signer { return Data([2]) + software.key.rawRepresentation }
         throw ExarchError.invalidEncoding
     }
@@ -139,6 +169,9 @@ public struct SecureEnclaveSigner: P256PayloadSigner, @unchecked Sendable {
     public func sign(_ payload: Data, reason: String?) async throws -> Data {
         let context: LAContext? = requiresPresence ? LAContext() : nil
         context?.localizedReason = reason ?? "Approve this action"
+#if os(macOS)
+        context?.localizedFallbackTitle = "Use Mac Password"
+#endif
         let key = try SecureEnclave.P256.Signing.PrivateKey(
             dataRepresentation: dataRepresentation,
             authenticationContext: context

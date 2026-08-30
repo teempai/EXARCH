@@ -582,6 +582,15 @@ export class ConversationCoordinator {
       });
     } catch (error) {
       this.store.markApprovalDeliveryFailed(approval.id);
+      // A recorded decision that the provider could not accept must not leave
+      // its native turn waiting forever. The decision remains auditable as a
+      // delivery failure and the provider turn is stopped best-effort.
+      try {
+        await adapter.interruptTurn(approval.turnId);
+      } catch {
+        // The original delivery error is the actionable failure returned to
+        // the client; interruption remains best-effort and audit state is kept.
+      }
       throw new ApprovalDeliveryError(
         error instanceof Error ? error.message : "Provider rejected approval delivery"
       );

@@ -737,7 +737,22 @@ final class MobileAppModel: ObservableObject {
                 pendingApproval = nil
                 voice.approvalResolved()
             } catch {
-                errorMessage = String(describing: error)
+                if let remote = error as? RemoteAPIError,
+                   ["approval_expired", "approval_not_pending", "approval_delivery_failed"].contains(remote.code) {
+                    pendingApproval = nil
+                    voice.approvalResolved()
+                    await refreshApprovals(approval.conversationId)
+                    if remote.code == "approval_expired" {
+                        errorMessage = "That approval expired before the decision reached your Mac. Run the action again if it is still needed."
+                    } else if remote.code == "approval_delivery_failed" {
+                        errorMessage = "Your decision reached the Mac, but \(approval.provider.displayName) could not accept it. The turn was stopped safely."
+                    }
+                    // `approval_not_pending` means the other mirrored client
+                    // already resolved it. Clearing the sheet is the success
+                    // path; no error alert is useful.
+                } else {
+                    errorMessage = String(describing: error)
+                }
             }
             busy = false
         }
@@ -976,17 +991,24 @@ final class MobileAppModel: ObservableObject {
             while !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(2))
                 guard let self else { continue }
-                do {
-                    if let id = self.activeConversation?.id {
+                if let id = self.activeConversation?.id {
+                    do {
                         try await self.refreshNewMessages(id)
-                        await self.refreshApprovals(id)
+                        self.lastSyncError = nil
+                    } catch {
+                        self.lastSyncError = String(describing: error)
                     }
+                    // Approval state is independently laptop-owned. A message
+                    // sync failure must never leave an expired or phone-decided
+                    // approval stuck on screen.
+                    await self.refreshApprovals(id)
+                }
+                do {
                     pollCount += 1
                     if pollCount.isMultiple(of: 5) {
                         try await self.refreshProviderSnapshots()
                         try await self.refreshLoadedThreadWindow()
                     }
-                    self.lastSyncError = nil
                 } catch {
                     self.lastSyncError = String(describing: error)
                 }
