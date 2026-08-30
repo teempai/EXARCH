@@ -4,6 +4,15 @@ import {
   type RelayHttpResponse
 } from "../../../packages/relay/src/index.js";
 
+const ORDINARY_REQUEST_TIMEOUT_MS = 30_000;
+const LONG_RUNNING_REQUEST_TIMEOUT_MS = 24 * 60 * 60_000;
+
+export function relayBridgeTimeoutMs(path: string): number {
+  return /^\/api\/v1\/conversations\/[^/]+\/messages$/.test(path)
+    ? LONG_RUNNING_REQUEST_TIMEOUT_MS
+    : ORDINARY_REQUEST_TIMEOUT_MS;
+}
+
 export class RelayHttpBridge {
   private readonly baseUrl: URL;
 
@@ -35,7 +44,11 @@ export class RelayHttpBridge {
         ? { body: Buffer.from(input.body ?? Buffer.alloc(0)) as unknown as BodyInit }
         : {}),
       redirect: "error",
-      signal: AbortSignal.timeout(30_000)
+      // Message submission currently stays open until the harness finishes.
+      // Keep that request alive just as the native loopback client does;
+      // otherwise a healthy Codex/Claude/Hermes turn is misreported as a 502
+      // after 30 seconds even though the laptop continues doing the work.
+      signal: AbortSignal.timeout(relayBridgeTimeoutMs(input.path))
     });
     return {
       status: response.status,

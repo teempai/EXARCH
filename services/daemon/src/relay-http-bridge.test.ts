@@ -1,7 +1,13 @@
 import { describe, expect, it, vi } from "vitest";
-import { RelayHttpBridge } from "./relay-http-bridge.js";
+import { RelayHttpBridge, relayBridgeTimeoutMs } from "./relay-http-bridge.js";
 
 describe("RelayHttpBridge", () => {
+  it("preserves long-running harness turns without weakening ordinary request bounds", () => {
+    expect(relayBridgeTimeoutMs("/api/v1/conversations/conv_1/messages")).toBe(24 * 60 * 60_000);
+    expect(relayBridgeTimeoutMs("/api/v1/providers")).toBe(30_000);
+    expect(relayBridgeTimeoutMs("/api/v1/conversations/conv_1/messages/extra")).toBe(30_000);
+  });
+
   it("forwards only the validated relative request to loopback", async () => {
     const request = vi.fn<typeof fetch>(async (input, init) => {
       expect(String(input)).toBe("http://127.0.0.1:43120/api/v1/health");

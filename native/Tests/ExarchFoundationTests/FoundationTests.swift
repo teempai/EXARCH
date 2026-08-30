@@ -192,6 +192,8 @@ struct FoundationTests {
         #expect(pending.sequence == .max)
         #expect(pending.clientMessageID == "message_local_1")
 
+        #expect(ConversationProjection.displayedMessages([], pending: pending) == [pending])
+
         let canonical = CanonicalEvent(
             id: "event_1",
             conversationId: "conversation_1",
@@ -211,6 +213,11 @@ struct FoundationTests {
             clientMessageID: "message_local_1",
             in: [canonical]
         ))
+        let canonicalMessage = ConversationProjection.messages(from: [canonical])[0]
+        #expect(ConversationProjection.displayedMessages(
+            [canonicalMessage],
+            pending: pending
+        ) == [canonicalMessage])
         #expect(!ConversationProjection.containsUserMessage(
             clientMessageID: "message_other",
             in: [canonical]

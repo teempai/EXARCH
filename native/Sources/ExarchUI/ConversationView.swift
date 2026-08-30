@@ -15,6 +15,17 @@ func shouldFollowLatestMessage(
     return followingLatest || latestMessageID?.hasPrefix("pending:") == true
 }
 
+func shouldShowPersistentWorkingIndicator(
+    messages: [ChatMessage],
+    turnStatus: ConversationTurnStatus?
+) -> Bool {
+    guard let turnStatus, case .working = turnStatus.phase else { return false }
+    guard let submittedIndex = messages.lastIndex(where: {
+        $0.role == .user && $0.clientMessageID == turnStatus.clientMessageID
+    }) else { return true }
+    return submittedIndex < messages.index(before: messages.endIndex)
+}
+
 public struct FocusFlowConversationView: View {
     @Binding private var provider: Provider
     @Binding private var modelName: String
@@ -138,6 +149,9 @@ public struct FocusFlowConversationView: View {
     public var body: some View {
         return VStack(spacing: 0) {
             transcriptRegion
+            if shouldShowPersistentWorkingIndicator(messages: messages, turnStatus: turnStatus) {
+                persistentWorkingIndicator
+            }
             composer
         }
         .background(FocusFlowTheme.canvas.ignoresSafeArea())
@@ -337,6 +351,10 @@ public struct FocusFlowConversationView: View {
             // computed property inside every ForEach row would rescan the full
             // transcript for every message as lazy-loaded history grows.
             let attributedMessageIDs = harnessAttributionPoints(in: messages)
+            let pinsWorkingIndicator = shouldShowPersistentWorkingIndicator(
+                messages: messages,
+                turnStatus: turnStatus
+            )
             ScrollViewReader { proxy in
                 ScrollView {
                     LazyVStack(spacing: 18) {
@@ -345,7 +363,8 @@ public struct FocusFlowConversationView: View {
                             VStack(spacing: 8) {
                                 messageRow(message, attributed: attributedMessageIDs.contains(message.id))
                                 if message.role == .user,
-                                   message.clientMessageID == turnStatus?.clientMessageID {
+                                   message.clientMessageID == turnStatus?.clientMessageID,
+                                   !pinsWorkingIndicator {
                                     turnStatusRow
                                 }
                             }
@@ -628,6 +647,23 @@ public struct FocusFlowConversationView: View {
         }
         .font(.footnote)
         .foregroundStyle(FocusFlowTheme.secondaryInk)
+        .accessibilityElement(children: .combine)
+    }
+
+    private var persistentWorkingIndicator: some View {
+        HStack(spacing: 8) {
+            ProgressView().controlSize(.small)
+            Text("Working on your laptop…")
+            Spacer()
+        }
+        .font(.footnote)
+        .foregroundStyle(FocusFlowTheme.secondaryInk)
+        .padding(.horizontal, 18)
+        .padding(.vertical, 8)
+        .background(FocusFlowTheme.canvas)
+        .overlay(alignment: .top) {
+            Divider().opacity(0.35)
+        }
         .accessibilityElement(children: .combine)
     }
 
