@@ -704,7 +704,7 @@ describe("CanonicalStore", () => {
   });
 
   it("records one bounded decision for a pending unexpired approval", () => {
-    const now = new Date("2026-08-23T12:00:00Z");
+    let now = new Date("2026-08-23T12:00:00Z");
     const store = new CanonicalStore(":memory:", { now: () => now });
     const project = store.createProject({
       name: "Approval",
@@ -741,8 +741,26 @@ describe("CanonicalStore", () => {
         decidedAt: now.toISOString(),
         signature: "signature"
       })
-    ).toThrow("not pending");
+    ).toThrow("already decided");
     expect(store.markApprovalDeliveryFailed(approval.id).status).toBe("delivery_failed");
+
+    const expiring = store.createApproval({
+      id: "approval_2",
+      conversationId: conversation.id,
+      turnId: "turn_2",
+      provider: "hermes",
+      request: { choices: ["once", "deny"], providerRequestId: "native_2" },
+      expiresAt: "2026-08-23T12:01:00Z"
+    });
+    now = new Date("2026-08-23T12:02:00Z");
+    expect(() => store.recordApprovalDecision({
+      approvalId: expiring.id,
+      choice: "once",
+      deviceId: "device_1",
+      decidedAt: now.toISOString(),
+      signature: "signature"
+    })).toThrow("expired before the decision arrived");
+    expect(store.getApproval(expiring.id).status).toBe("expired");
     store.close();
   });
 

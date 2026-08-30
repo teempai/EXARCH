@@ -26,6 +26,20 @@ export interface CanonicalStoreOptions {
   now?: () => Date;
 }
 
+export class ApprovalNotPendingError extends Error {
+  constructor(readonly status: ApprovalRecord["status"]) {
+    super(`Approval is already ${status}`);
+    this.name = "ApprovalNotPendingError";
+  }
+}
+
+export class ApprovalExpiredError extends Error {
+  constructor() {
+    super("Approval expired before the decision arrived");
+    this.name = "ApprovalExpiredError";
+  }
+}
+
 export interface ProjectRecord {
   id: string;
   name: string;
@@ -748,10 +762,11 @@ export class CanonicalStore {
     signature: string;
   }): ApprovalRecord {
     const approval = this.getApproval(input.approvalId);
-    if (approval.status !== "pending") throw new Error("Approval is not pending");
+    if (approval.status === "expired") throw new ApprovalExpiredError();
+    if (approval.status !== "pending") throw new ApprovalNotPendingError(approval.status);
     if (Date.parse(approval.expiresAt) <= this.now().getTime()) {
       this.database.prepare("UPDATE approvals SET status = 'expired' WHERE id = ?").run(input.approvalId);
-      throw new Error("Approval expired");
+      throw new ApprovalExpiredError();
     }
     const choices = Array.isArray(approval.request.choices)
       ? approval.request.choices.filter((choice): choice is string => typeof choice === "string")

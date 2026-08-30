@@ -10,6 +10,8 @@ import {
   type SignedRequestHeaders
 } from "../../../packages/protocol/src/index.js";
 import {
+  ApprovalExpiredError,
+  ApprovalNotPendingError,
   AuthenticationError,
   DeviceAuthenticator,
   WorkspaceScopeError,
@@ -454,6 +456,10 @@ export class LaptopApiServer {
         });
       } else if (error instanceof ApprovalDeliveryError) {
         sendJson(response, 502, { error: "approval_delivery_failed", message: error.message });
+      } else if (error instanceof ApprovalExpiredError) {
+        sendJson(response, 410, { error: "approval_expired", message: error.message });
+      } else if (error instanceof ApprovalNotPendingError) {
+        sendJson(response, 409, { error: "approval_not_pending", message: error.message });
       } else if (error instanceof WorkspaceUnavailableError) {
         sendJson(response, 423, { error: "workspace_unavailable", message: error.message });
       } else if (error instanceof PayloadTooLargeError) {

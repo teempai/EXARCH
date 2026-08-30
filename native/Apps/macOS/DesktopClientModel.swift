@@ -389,11 +389,23 @@ final class DesktopClientModel: ObservableObject {
             while !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(2))
                 guard let self else { return }
-                do {
-                    if let id = self.activeConversation?.id {
+                if let id = self.activeConversation?.id {
+                    do {
                         try await self.refreshNewMessages(id)
-                        try await self.refreshApprovals(id)
+                        self.lastSyncError = nil
+                    } catch {
+                        self.lastSyncError = self.describe(error)
                     }
+                    do {
+                        try await self.refreshApprovals(id)
+                    } catch {
+                        // Keep the last known sheet only for a transient
+                        // approval-fetch failure; the next independent poll
+                        // retries even when message sync remains unavailable.
+                        self.lastSyncError = self.describe(error)
+                    }
+                }
+                do {
                     count += 1
                     if count.isMultiple(of: 5) {
                         try await self.refreshProviderSnapshots()
@@ -1222,6 +1234,10 @@ final class DesktopClientModel: ObservableObject {
                 let signer = try await keyManager.signer(for: .approval)
                 let decision = try await ApprovalDecisionSigner(deviceID: deviceID, signer: signer)
                     .sign(approval: approval, choice: choice)
+                try await synchronizeLocalApprovalIdentity(
+                    approvalPublicKey: signer.encodedPublicKey,
+                    deviceID: deviceID
+                )
                 let _: Approval = try await api.post(
                     "/api/v1/approvals/\(approval.id)/decision",
                     input: decision,
@@ -1229,7 +1245,18 @@ final class DesktopClientModel: ObservableObject {
                 )
                 pendingApproval = nil
             } catch {
-                errorMessage = describe(error)
+                if let remote = error as? RemoteAPIError,
+                   ["approval_expired", "approval_not_pending", "approval_delivery_failed"].contains(remote.code) {
+                    pendingApproval = nil
+                    try? await refreshApprovals(approval.conversationId)
+                    if remote.code == "approval_expired" {
+                        errorMessage = "That approval expired before the decision reached the provider. Run the action again if it is still needed."
+                    } else if remote.code == "approval_delivery_failed" {
+                        errorMessage = "Your decision was recorded, but \(approval.provider.displayName) could not accept it. The turn was stopped safely."
+                    }
+                } else {
+                    errorMessage = describe(error)
+                }
             }
             busy = false
         }
@@ -1357,6 +1384,30 @@ final class DesktopClientModel: ObservableObject {
         guard try await context.evaluatePolicy(.deviceOwnerAuthentication, localizedReason: reason) else {
             throw ExarchError.authenticationFailed
         }
+    }
+
+    /// A legacy desktop approval key may be biometric-only. `DeviceKeyManager`
+    /// rotates it to a Secure Enclave user-presence key on first use, after
+    /// which this updates only the already-enrolled loopback Mac identity. The
+    /// phone pairing and canonical context are deliberately untouched.
+    private func synchronizeLocalApprovalIdentity(
+        approvalPublicKey: String,
+        deviceID: String
+    ) async throws {
+        let devices = try await enrollment.listDevices()
+        guard let local = devices.first(where: { $0.id == deviceID }),
+              local.approvalPublicKey != approvalPublicKey else { return }
+        let signing = try await keyManager.signer(for: .request)
+        let enrolled = try await enrollment.repair(
+            signingPublicKey: signing.encodedPublicKey,
+            approvalPublicKey: approvalPublicKey,
+            displayName: Host.current().localizedName ?? "This Mac"
+        )
+        guard enrolled.deviceId == deviceID else {
+            throw ExarchError.unavailable("The local approval identity changed unexpectedly")
+        }
+        try enrollment.remember(enrolled, signingPublicKey: signing.encodedPublicKey)
+        knownDevices = try await enrollment.listDevices()
     }
 
     private func describe(_ error: Error) -> String {

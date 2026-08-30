@@ -403,6 +403,7 @@ describe("ConversationCoordinator", () => {
       })
     ).rejects.toBeInstanceOf(ApprovalDeliveryError);
     expect(store.getApproval(approval?.id as string).status).toBe("delivery_failed");
+    expect(claude.interruptedTurns).toContain(approval?.turnId);
     store.close();
   });
 
