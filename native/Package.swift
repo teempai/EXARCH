@@ -20,7 +20,7 @@ let package = Package(
             url: "https://github.com/swift-libp2p/swift-noise.git",
             revision: "0adfd28786322784860fb3c8f228591c6e8fd92f"
         ),
-        .package(url: "https://github.com/apple/swift-crypto.git", exact: "4.5.1"),
+        .package(url: "https://github.com/apple/swift-crypto.git", exact: "4.5.2"),
         .package(url: "https://github.com/gonzalezreal/swift-markdown-ui.git", exact: "2.4.1")
     ],
     targets: [
